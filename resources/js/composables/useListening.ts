@@ -4,7 +4,7 @@ import axios from 'axios';
 type ListeningResult = {
     lineId: number | null;
     mode: 'arabic' | 'coptic_arabized';
-    confidence: float;
+    confidence: number;
 };
 
 export function useListening(dayKey: string) {
@@ -49,14 +49,14 @@ export function useListening(dayKey: string) {
                 const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
                 audioChunksRef.current = [];
 
-                // In a real implementation, we send the blob. 
+                // In a real implementation, we send the blob.
                 // For MVP/Mock, we might send a trigger or just simulate.
                 try {
-                    const { data } = await axios.post('/api/listen/chunk', {
-                        sessionId: data.sessionId, // This uses the closure's data.sessionId
+                    const { data: chunkData } = await axios.post('/api/listen/chunk', {
+                        sessionId,
                         audio: 'CHUNK_DATA', // Real: base64 or blob
                     });
-                    setResult(data);
+                    setResult(chunkData);
                 } catch (e) {
                     console.error('Failed to send chunk', e);
                 }
