@@ -2,6 +2,7 @@ import HosLayout from '@/layouts/HosLayout';
 import { Head, Link } from '@inertiajs/react';
 import {
     BookOpen,
+    Monitor,
     Calendar,
     ChevronLeft,
     Clock,
@@ -138,7 +139,7 @@ export default function Dashboard({
                                 </Link>
 
                                 <Link
-                                    href={`/presentation/${dayKey}`}
+                                    href={`/presentation/lectionary/${dayKey}`}
                                     className="inline-flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400 px-4 py-2.5 text-sm font-semibold shadow-sm transition-all hover:bg-amber-500/20 active:scale-[0.98]"
                                 >
                                     <Sparkles className="h-4 w-4" />
@@ -165,36 +166,74 @@ export default function Dashboard({
                     </h2>
                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
 
-                        <Link
-                            href={`/presentation/${dayKey}`}
-                            className="group flex items-center gap-4 rounded-xl border border-border bg-card p-4 shadow-sm transition-all hover:border-primary/20 hover:shadow-md active:scale-[0.98]"
-                        >
-                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
-                                <BookOpen className="h-5 w-5" />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                                <h3 className="truncate text-sm font-semibold text-foreground">
-                                    القطمارس
-                                </h3>
+                    {/* الحاوية الرئيسية أصبحت div بدلاً من Link */}
+                        <div className="group flex flex-col sm:flex-row items-start sm:items-center gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm transition-all hover:shadow-md">
 
-                            </div>
-                            <ChevronLeft className="h-4 w-4 shrink-0 text-muted-foreground/50 transition-transform group-hover:-translate-x-1 rtl:rotate-0" />
-                        </Link>
-                        <Link
-                            href={`/#`}
-                            className="group flex items-center gap-4 rounded-xl border border-border bg-card p-4 shadow-sm transition-all hover:border-primary/20 hover:shadow-md active:scale-[0.98]"
-                        >
-                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
-                                <BookOpen className="h-5 w-5" />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                                <h3 className="truncate text-sm font-semibold text-foreground">
-                                    القداس الالهي
-                                </h3>
+                            {/* الجزء الأيمن: الأيقونة والعنوان */}
+                            <div className="flex items-center gap-4 flex-1 min-w-0">
+                                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                                    <BookOpen className="h-6 w-6" />
+                                </div>
 
+                                <div className="min-w-0">
+                                    <h1 className="text-base font-bold text-foreground font-reading mb-0.5">
+                                        القطمارس
+                                    </h1>
+                                </div>
                             </div>
-                            <ChevronLeft className="h-4 w-4 shrink-0 text-muted-foreground/50 transition-transform group-hover:-translate-x-1 rtl:rotate-0" />
-                        </Link>
+
+                            {/* الجزء الأيسر: أزرار الأكشن */}
+                            <div className="flex items-center gap-1 w-full sm:w-auto shrink-0 border-t sm:border-t-0 pt-3 sm:pt-0">
+                                <Link
+                                    href={`/presentation/lectionary/${dayKey}`}
+                                    className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400 px-2 py-2 text-sm font-bold shadow-sm transition-all hover:bg-amber-500/20 active:scale-[0.96]"
+                                >
+                                    <Monitor className="h-4 w-4" />
+                                    <span>عرض</span>
+                                </Link>
+
+                                <Link
+                                    href={`#`}
+                                    className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1 rounded-xl border border-border bg-background px-2 py-2 text-sm font-medium text-foreground shadow-sm transition-all hover:bg-muted active:scale-[0.96]"
+                                >
+                                    <Mic className="h-4 w-4" />
+                                    <span>استماع</span>
+                                </Link>
+                            </div>
+                        </div>
+                        <div className="group flex flex-col sm:flex-row items-start sm:items-center gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm transition-all hover:shadow-md">
+
+                            <div className="flex items-center gap-4 flex-1 min-w-0">
+                                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                                    <BookOpen className="h-6 w-6" />
+                                </div>
+
+                                <div className="min-w-0">
+                                    <h1 className="text-base font-bold text-foreground font-reading mb-0.5">
+                                       القداس الالهي
+                                    </h1>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-1 w-full sm:w-auto shrink-0 border-t sm:border-t-0 pt-3 sm:pt-0">
+                                <Link
+                                    href={`/presentation/liturgy/${dayKey}`}
+                                    className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400 px-2 py-2 text-sm font-bold shadow-sm transition-all hover:bg-amber-500/20 active:scale-[0.96]"
+                                >
+                                    <Monitor className="h-4 w-4" />
+                                    <span>عرض</span>
+                                </Link>
+
+                                <Link
+                                    href={`#`}
+                                    className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1 rounded-xl border border-border bg-background px-2 py-2 text-sm font-medium text-foreground shadow-sm transition-all hover:bg-muted active:scale-[0.96]"
+                                >
+                                    <Mic className="h-4 w-4" />
+                                    <span>استماع</span>
+                                </Link>
+                            </div>
+                        </div>
+
                         <Link
                             href={`/#`}
                             className="group flex items-center gap-4 rounded-xl border border-border bg-card p-4 shadow-sm transition-all hover:border-primary/20 hover:shadow-md active:scale-[0.98]"

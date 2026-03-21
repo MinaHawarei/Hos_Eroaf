@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Head, router } from '@inertiajs/react';
 import { usePresentationNavigation } from '@/hooks/usePresentationNavigation';
 import { useExternalPresentation } from '@/hooks/useExternalPresentation';
+import { useSlideSplitter } from '@/hooks/useSlideSplitter';
 import { SplitViewReader } from '@/components/SplitViewReader';
 import { PresentationSidebar } from '@/components/PresentationSidebar';
 import { SearchOverlay } from '@/components/SearchOverlay';
@@ -278,9 +279,10 @@ export default function PresentationPage({ copticDate, seasonLabel, sections, sl
 
                     {/* Slide counter */}
                     <span className="flex items-center px-3 md:px-4 font-mono text-base md:text-lg text-muted-foreground select-none whitespace-nowrap">
-                        <span className="text-foreground font-bold">{currentSlideIndex + 1}</span>
-                        <span className="mx-1.5 text-border">/</span>
                         <span>{slides.length}</span>
+                        <span className="mx-1.5 text-border">/</span>
+                        <span className="text-foreground font-bold">{currentSlideIndex + 1}</span>
+
                     </span>
 
                     {/* Next (Left in RTL) */}
@@ -297,13 +299,6 @@ export default function PresentationPage({ copticDate, seasonLabel, sections, sl
                 </div>
             </div>
 
-            {/* ═══════ Progress Bar ═══════ */}
-            <div className="slide-progress">
-                <div
-                    className="slide-progress-bar"
-                    style={{ width: `${progressPercent}%` }}
-                />
-            </div>
         </div>
     );
 }

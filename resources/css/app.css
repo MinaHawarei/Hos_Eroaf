@@ -533,14 +533,14 @@
 
 /* --- Text column divider --- */
 .column-divider {
-    width: 1px;
+    width: 2px;
     align-self: stretch;
     background: linear-gradient(180deg,
             transparent 0%,
             var(--primary) 30%,
             var(--primary) 70%,
             transparent 100%);
-    opacity: 0.25;
+    opacity: 1;
     margin-block: 0.5rem;
 }
 

@@ -12,13 +12,12 @@ use Inertia\Inertia;
 // Dashboard — today's readings overview
 Route::get('/', DashboardController::class)->name('home');
 
-// External presentation viewer (secondary screen, no controls)
-Route::get('/presentation/external', function () {
-    return Inertia::render('ExternalPresentation');
-})->name('presentation.external');
-
 // Presentation — fullscreen presentation of liturgy
-Route::get('/presentation/{dayKey}', [PresentationController::class, 'show'])->name('presentation.show');
+Route::prefix('presentation')->group(function () {
+    Route::get('/lectionary/{dayKey}', [PresentationController::class, 'lectionary'])->name('presentation.lectionary');
+    Route::get('/liturgy/{dayKey}', [PresentationController::class, 'liturgy'])->name('presentation.liturgy');
+});
+Route::get('/presentation/{dayKey}', [PresentationController::class, 'lectionary '])->name('presentation.show');
 
 // Settings
 Route::get('/settings', [SettingsController::class, 'index'])->name('settings');
