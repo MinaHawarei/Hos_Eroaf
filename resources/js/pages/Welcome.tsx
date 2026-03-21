@@ -12,7 +12,7 @@ type Props = {
 
 export default function Welcome({ canLogin, canRegister }: Props) {
     return (
-        <div className="relative min-h-screen overflow-hidden bg-white text-slate-900 selection:bg-primary/20 dark:bg-[#0a0a0a] dark:text-slate-200">
+        <div className="relative min-h-screen overflow-hidden bg-background text-foreground selection:bg-primary/20">
             <Head title="مرحباً بك" />
 
             {/* Decorative Background Elements */}
@@ -61,7 +61,7 @@ export default function Welcome({ canLogin, canRegister }: Props) {
                         </span>
                     </h1>
 
-                    <p className="mt-8 max-w-2xl text-lg leading-relaxed text-slate-600 dark:text-slate-400 sm:text-xl">
+                    <p className="mt-8 max-w-2xl text-lg leading-relaxed text-muted-foreground sm:text-xl">
                         هوس إيروف هو رفيقك الروحي اليومي، يقدم لك قراءات القطمارس اليومية بكل سهولة وسلاسة، مع واجهة مستخدم عصرية تدعم اللغة العربية والوضع الداكن.
                     </p>
 
@@ -79,20 +79,20 @@ export default function Welcome({ canLogin, canRegister }: Props) {
 
                     {/* App Preview Mockup */}
                     <div className="mt-20 relative px-4 sm:px-0">
-                        <div className="relative mx-auto max-w-5xl rounded-2xl border border-slate-200 bg-slate-50/50 p-2 shadow-2xl dark:border-slate-800 dark:bg-slate-900/50">
-                            <div className="rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
-                                <div className="flex h-8 items-center border-b border-slate-100 px-4 dark:border-slate-900">
+                        <div className="relative mx-auto max-w-5xl rounded-2xl border border-border bg-card/50 p-2 shadow-[0_10px_40px_-10px_rgba(201,163,78,0.2)] dark:shadow-[0_10px_40px_-10px_rgba(212,175,55,0.1)]">
+                            <div className="rounded-xl border border-border bg-card">
+                                <div className="flex h-8 items-center border-b border-border px-4">
                                     <div className="flex gap-1.5">
-                                        <div className="h-2.5 w-2.5 rounded-full bg-slate-200 dark:bg-slate-800" />
-                                        <div className="h-2.5 w-2.5 rounded-full bg-slate-200 dark:bg-slate-800" />
-                                        <div className="h-2.5 w-2.5 rounded-full bg-slate-200 dark:bg-slate-800" />
+                                        <div className="h-2.5 w-2.5 rounded-full bg-muted-foreground/30" />
+                                        <div className="h-2.5 w-2.5 rounded-full bg-muted-foreground/30" />
+                                        <div className="h-2.5 w-2.5 rounded-full bg-muted-foreground/30" />
                                     </div>
                                 </div>
                                 <div className="aspect-[16/9] overflow-hidden">
-                                    <div className="flex h-full items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-[#0d0d0d] dark:to-[#151515]">
+                                    <div className="flex h-full items-center justify-center bg-card">
                                         <div className="flex flex-col items-center gap-4">
                                             <BookOpen className="h-20 w-20 text-primary opacity-20" />
-                                            <p className="text-sm font-medium text-slate-400">معاينة واجهة القارئ الذكي</p>
+                                            <p className="text-sm font-medium text-muted-foreground">معاينة واجهة القارئ الذكي</p>
                                         </div>
                                     </div>
                                 </div>
@@ -129,8 +129,8 @@ export default function Welcome({ canLogin, canRegister }: Props) {
                 </section>
 
                 {/* Footer */}
-                <footer className="mt-auto border-t border-slate-100 py-12 text-center dark:border-slate-900">
-                    <p className="text-sm text-slate-500">
+                <footer className="mt-auto border-t border-border py-12 text-center">
+                    <p className="text-sm text-muted-foreground">
                         © {new Date().getFullYear()} هوس إيروف. صنع بكل حب لخدمة الكنيسة القبطية الأرثوذكسية.
                     </p>
                 </footer>

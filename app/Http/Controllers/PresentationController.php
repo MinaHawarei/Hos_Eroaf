@@ -38,6 +38,7 @@ class PresentationController extends Controller
         $sectionsRaw = $dayData;
         $copticDate = $sectionsRaw['Day'] ?? '';
         unset($sectionsRaw['Day']);
+        unset($sectionsRaw['style']);
 
         // ✅ Transform sections - using title_ar from JSON
         $sections = collect($sectionsRaw)
@@ -60,10 +61,11 @@ class PresentationController extends Controller
                         return [
                             'id' => $index + 1,
                             'title_ar' => $reading['title_ar'] ?? $sectionName,
-                            'intonation_ar' => $reading['intonation_ar'] ?? null, // ✅ إضافة intonation عربية
-                            'intonation_co' => $reading['intonation_co'] ?? null, // ✅ إضافة intonation قبطية
+                            'intonation_ar' => $reading['intonation_ar'] ?? null,
+                            'intonation_co' => $reading['intonation_co'] ?? null,
                             'has_coptic' => $hasCoptic,
                             'lines' => $lines,
+                            'style' => 1,
                         ];
                     })->values(),
                 ];
@@ -94,7 +96,7 @@ class PresentationController extends Controller
                 ];
             }
         }
-
+        //dd($slides);
         // If no slides, show empty state
         if (empty($slides)) {
             return Inertia::render('PresentationPage', [
@@ -125,6 +127,7 @@ class PresentationController extends Controller
 
         $textAr = $reading['text_ar'] ?? [];
         $textCo = $reading['text_co'] ?? [];
+        $textArCo = $reading['text_ar_co'] ?? [];
 
         // Determine the maximum number of lines
         $maxLines = max(count($textAr), count($textCo));
@@ -133,9 +136,10 @@ class PresentationController extends Controller
         for ($i = 0; $i < $maxLines; $i++) {
             $arText = $textAr[$i] ?? '';
             $coText = $textCo[$i] ?? '';
+            $arCoText = $textArCo[$i] ?? '';
 
             // If both exist, create two lines
-            if (!empty($arText) && !empty($coText)) {
+            if (!empty($arText) && !empty($arCoText)) {
                 // Arabic line
                 $lines[] = [
                     'id' => $lineOrder++,
@@ -146,8 +150,13 @@ class PresentationController extends Controller
                 // Coptic line
                 $lines[] = [
                     'id' => $lineOrder++,
-                    'lang_type' => 'coptic_arabized',
+                    'lang_type' => 'coptic',
                     'text' => $coText,
+                ];
+                $lines[] = [
+                    'id' => $lineOrder++,
+                    'lang_type' => 'coptic_arabized',
+                    'text' => $arCoText,
                 ];
             }
             // If only Arabic exists
@@ -159,11 +168,11 @@ class PresentationController extends Controller
                 ];
             }
             // If only Coptic exists
-            elseif (!empty($coText)) {
+            elseif (!empty($arCoText)) {
                 $lines[] = [
                     'id' => $lineOrder++,
                     'lang_type' => 'coptic_arabized',
-                    'text' => $coText,
+                    'text' => $arCoText,
                 ];
             }
         }
@@ -198,7 +207,7 @@ class PresentationController extends Controller
         // Simple extraction - you can make this more sophisticated
         if (str_contains($copticDate, 'توت') || str_contains($copticDate, 'بابه') ||
             str_contains($copticDate, 'هاتور') || str_contains($copticDate, 'كيهك')) {
-            return 'القطمارس السنوي';
+            return 'القطمارس';
         }
 
         return '';

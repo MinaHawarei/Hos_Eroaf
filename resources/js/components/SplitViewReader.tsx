@@ -17,7 +17,7 @@ export function SplitViewReader({ lines, hasCoptic, className }: SplitViewReader
         return (
             <div className={cn("flex flex-col gap-6 text-center max-w-4xl mx-auto w-full", className)}>
                 {lines.map((line, index) => (
-                    <p key={line.id || index} className="text-3xl md:text-5xl leading-relaxed text-slate-900 dark:text-slate-100 font-bold">
+                    <p key={line.id || index} className="text-3xl md:text-5xl leading-relaxed text-foreground font-reading font-bold drop-shadow-sm">
                         {line.text}
                     </p>
                 ))}
@@ -46,19 +46,19 @@ export function SplitViewReader({ lines, hasCoptic, className }: SplitViewReader
                     {/* Arabic Column (Right in RTL) */}
                     <div className="flex-1 text-center md:text-right">
                         {ar && (
-                            <p className="text-3xl md:text-5xl leading-relaxed text-slate-900 dark:text-slate-100 font-bold">
+                            <p className="text-3xl md:text-5xl leading-relaxed text-foreground font-reading font-bold drop-shadow-sm">
                                 {ar.text}
                             </p>
                         )}
                     </div>
 
-                    {/* Divider */}
-                    <div className="hidden md:block w-px bg-slate-300 dark:bg-slate-700 opacity-50 my-2" />
+                    {/* Divider text/decor */}
+                    <div className="hidden md:block w-px bg-border opacity-50 my-2 shadow-[0_0_10px_rgba(201,163,78,0.3)]" />
 
                     {/* Coptic Column (Left in RTL) */}
-                    <div className="flex-1 text-center md:text-left">
+                    <div className="flex-1 text-center md:text-right">
                         {cop && (
-                            <p className="text-3xl md:text-5xl leading-relaxed text-amber-900 dark:text-amber-500 font-bold opacity-90">
+                            <p className="text-3xl md:text-5xl leading-relaxed text-primary font-reading font-bold opacity-90 drop-shadow-sm">
                                 {cop.text}
                             </p>
                         )}

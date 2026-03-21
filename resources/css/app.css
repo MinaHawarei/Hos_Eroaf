@@ -8,17 +8,20 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-    /* Arabic-optimized font stack */
+    /* Main UI Font stack (Cairo/Merriweather) */
     --font-sans:
-        'IBM Plex Sans Arabic', 'Noto Naskh Arabic',
+        'Cairo', 'Merriweather',
         ui-sans-serif, system-ui, -apple-system, sans-serif,
         'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
         'Noto Color Emoji';
 
-    /* Decorative Coptic/reading font */
+    /* Decorative Coptic/reading font (Amiri/Playfair Display) */
     --font-reading:
-        'Noto Naskh Arabic', 'IBM Plex Sans Arabic',
+        'Amiri', 'Playfair Display',
         serif;
+
+    --font-serif:
+        'Playfair Display', 'Amiri', serif;
 
     --radius-lg: var(--radius);
     --radius-md: calc(var(--radius) - 2px);
@@ -93,33 +96,33 @@
 /*
  * ===================================
  *  HosErof — Coptic-inspired palette
- *  Warm golds + deep navy + subtle cream
+ *  Ancient paper + deep inks + gold
  * ===================================
  */
 :root {
     /* Core palette */
-    --background: hsl(40 33% 98%);
-    --foreground: hsl(222 47% 11%);
+    --background: #F5E6C8;
+    --foreground: #2B2B2B;
 
-    --card: hsl(0 0% 100%);
-    --card-foreground: hsl(222 47% 11%);
+    --card: #FDF9ED;
+    --card-foreground: #2B2B2B;
 
-    --popover: hsl(0 0% 100%);
-    --popover-foreground: hsl(222 47% 11%);
+    --popover: #F5E6C8;
+    --popover-foreground: #2B2B2B;
 
-    /* Deep navy-gold Coptic primary */
-    --primary: hsl(222 47% 25%);
-    --primary-foreground: hsl(40 33% 98%);
+    /* Deep Gold Coptic primary */
+    --primary: #C9A34E;
+    --primary-foreground: #2B2B2B;
 
-    --secondary: hsl(40 30% 93%);
-    --secondary-foreground: hsl(222 47% 20%);
+    --secondary: #EAD7B0;
+    --secondary-foreground: #2B2B2B;
 
-    --muted: hsl(40 20% 95%);
-    --muted-foreground: hsl(220 9% 46%);
+    --muted: #EAD7B0;
+    --muted-foreground: #5C5C5C;
 
-    /* Gold accent — inspired by Coptic icons */
-    --accent: hsl(38 80% 55%);
-    --accent-foreground: hsl(222 47% 11%);
+    /* Deep Red accent */
+    --accent: #8B2E2E;
+    --accent-foreground: #F5E6C8;
 
     --destructive: hsl(0 72% 51%);
     --destructive-foreground: hsl(0 0% 98%);
@@ -128,52 +131,54 @@
     --success-foreground: hsl(0 0% 100%);
 
     --warning: hsl(38 92% 50%);
-    --warning-foreground: hsl(222 47% 11%);
+    --warning-foreground: #2B2B2B;
 
-    --border: hsl(40 20% 90%);
-    --input: hsl(40 20% 88%);
-    --ring: hsl(222 47% 25%);
+    --border: #E0CFA9;
+    --input: #EAD7B0;
+    --ring: #C9A34E;
 
-    --chart-1: hsl(38 80% 55%);
-    --chart-2: hsl(222 47% 40%);
+    --chart-1: #C9A34E;
+    --chart-2: #8B2E2E;
     --chart-3: hsl(142 50% 40%);
     --chart-4: hsl(0 60% 55%);
     --chart-5: hsl(280 50% 55%);
 
     --radius: 0.625rem;
 
-    --sidebar-background: hsl(40 33% 97%);
-    --sidebar-foreground: hsl(222 47% 20%);
-    --sidebar-primary: hsl(222 47% 25%);
-    --sidebar-primary-foreground: hsl(40 33% 98%);
-    --sidebar-accent: hsl(40 30% 93%);
-    --sidebar-accent-foreground: hsl(222 47% 20%);
-    --sidebar-border: hsl(40 20% 90%);
-    --sidebar-ring: hsl(38 80% 55%);
-    --sidebar: hsl(40 33% 97%);
+    --sidebar-background: #F5E6C8;
+    --sidebar-foreground: #2B2B2B;
+    --sidebar-primary: #C9A34E;
+    --sidebar-primary-foreground: #2B2B2B;
+    --sidebar-accent: #EAD7B0;
+    --sidebar-accent-foreground: #2B2B2B;
+    --sidebar-border: #E0CFA9;
+    --sidebar-ring: #C9A34E;
+    --sidebar: #F5E6C8;
+
+    --texture-opacity: 0.25;
 }
 
 .dark {
-    --background: hsl(222 47% 7%);
-    --foreground: hsl(40 20% 95%);
+    --background: #121212;
+    --foreground: #EDE6D6;
 
-    --card: hsl(222 40% 10%);
-    --card-foreground: hsl(40 20% 95%);
+    --card: #1E1A16;
+    --card-foreground: #EDE6D6;
 
-    --popover: hsl(222 40% 10%);
-    --popover-foreground: hsl(40 20% 95%);
+    --popover: #121212;
+    --popover-foreground: #EDE6D6;
 
-    --primary: hsl(38 80% 55%);
-    --primary-foreground: hsl(222 47% 7%);
+    --primary: #D4AF37;
+    --primary-foreground: #121212;
 
-    --secondary: hsl(222 30% 16%);
-    --secondary-foreground: hsl(40 20% 90%);
+    --secondary: #2B2B2B;
+    --secondary-foreground: #EDE6D6;
 
-    --muted: hsl(222 30% 14%);
-    --muted-foreground: hsl(220 9% 55%);
+    --muted: #1E1A16;
+    --muted-foreground: #A09786;
 
-    --accent: hsl(38 75% 50%);
-    --accent-foreground: hsl(222 47% 7%);
+    --accent: #A94442;
+    --accent-foreground: #EDE6D6;
 
     --destructive: hsl(0 72% 55%);
     --destructive-foreground: hsl(0 0% 98%);
@@ -182,27 +187,29 @@
     --success-foreground: hsl(0 0% 100%);
 
     --warning: hsl(38 92% 55%);
-    --warning-foreground: hsl(222 47% 7%);
+    --warning-foreground: #121212;
 
-    --border: hsl(222 30% 16%);
-    --input: hsl(222 30% 18%);
-    --ring: hsl(38 80% 55%);
+    --border: #3B332B;
+    --input: #2B2B2B;
+    --ring: #D4AF37;
 
-    --chart-1: hsl(38 80% 60%);
-    --chart-2: hsl(200 60% 50%);
+    --chart-1: #D4AF37;
+    --chart-2: #A94442;
     --chart-3: hsl(142 60% 50%);
     --chart-4: hsl(280 60% 60%);
     --chart-5: hsl(340 70% 55%);
 
-    --sidebar-background: hsl(222 47% 6%);
-    --sidebar-foreground: hsl(40 20% 90%);
-    --sidebar-primary: hsl(38 80% 55%);
-    --sidebar-primary-foreground: hsl(222 47% 7%);
-    --sidebar-accent: hsl(222 30% 14%);
-    --sidebar-accent-foreground: hsl(40 20% 90%);
-    --sidebar-border: hsl(222 30% 16%);
-    --sidebar-ring: hsl(38 80% 55%);
-    --sidebar: hsl(222 47% 6%);
+    --sidebar-background: #121212;
+    --sidebar-foreground: #EDE6D6;
+    --sidebar-primary: #D4AF37;
+    --sidebar-primary-foreground: #121212;
+    --sidebar-accent: #1E1A16;
+    --sidebar-accent-foreground: #EDE6D6;
+    --sidebar-border: #3B332B;
+    --sidebar-ring: #D4AF37;
+    --sidebar: #121212;
+
+    --texture-opacity: 0.05;
 }
 
 @layer base {
@@ -211,7 +218,25 @@
     }
 
     body {
-        @apply bg-background text-foreground;
+        @apply bg-background text-foreground transition-colors duration-300;
+        position: relative;
+    }
+
+    body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        opacity: var(--texture-opacity);
+        z-index: -10;
+        pointer-events: none;
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.5'/%3E%3C/svg%3E");
+        background-repeat: repeat;
+        mix-blend-mode: multiply;
+        transition: opacity 0.3s ease;
+    }
+
+    .dark body::before {
+        mix-blend-mode: color-dodge;
     }
 }
 

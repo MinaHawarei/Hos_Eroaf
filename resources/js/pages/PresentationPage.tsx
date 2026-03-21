@@ -6,7 +6,6 @@ import { PresentationSidebar } from '@/components/PresentationSidebar';
 import { SearchOverlay } from '@/components/SearchOverlay';
 import { Button } from '@/components/ui/button';
 import { Search, Maximize, Minimize, Settings, ChevronLeft, ChevronRight } from 'lucide-react';
-import { DateSelector } from '@/components/DateSelector';
 
 interface Slide {
     id: string;
@@ -26,7 +25,7 @@ interface PresentationPageProps {
     slides: Slide[];
 }
 
-export default function PresentationPage({ dayKey, copticDate, seasonLabel, sections, slides }: PresentationPageProps) {
+export default function PresentationPage({ copticDate, seasonLabel, sections, slides }: PresentationPageProps) {
     const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [searchOpen, setSearchOpen] = useState(false);
@@ -91,7 +90,7 @@ export default function PresentationPage({ dayKey, copticDate, seasonLabel, sect
             <Head title={`عرض - ${copticDate}`} />
 
             {/* Top Toolbar (Hidden automatically when inactive in future iterations, or minimal) */}
-            <div className={`fixed top-0 left-0 right-0 z-30 p-4 transition-opacity duration-300 flex items-center justify-between ${isFullscreen ? 'opacity-0 hover:opacity-100' : ''}`}>
+            <div className={`fixed top-0 left-0 right-15 z-30 p-4 transition-opacity duration-300 flex items-center justify-between ${isFullscreen ? 'opacity-0 hover:opacity-100' : ''}`}>
                 <div className="flex items-center gap-4 bg-zinc-900/80 backdrop-blur-md px-4 py-2 rounded-full border border-zinc-800 shadow-xl">
                     <Button variant="ghost" size="sm" className="h-8 md:h-9 hover:bg-zinc-800 text-zinc-300" onClick={() => router.visit('/')}>
                         الخروج
@@ -148,8 +147,10 @@ export default function PresentationPage({ dayKey, copticDate, seasonLabel, sect
             </main>
 
             {/* Bottom Controls */}
-            <div className={`fixed bottom-0 left-0 right-0 z-30 p-8 flex items-center justify-between pointer-events-none ${isFullscreen ? 'opacity-0 hover:opacity-100 transition-opacity duration-300' : ''}`}>
-                <div className="flex gap-4 pointer-events-auto bg-black/50 backdrop-blur-md rounded-full border border-white/10 p-2">
+           <div className={`fixed bottom-0 left-0 right-0 z-30 p-8 flex items-center justify-end pointer-events-none ${isFullscreen ? 'opacity-0 hover:opacity-100 transition-opacity duration-300' : ''}`}>
+
+                <div className="flex flex-row-reverse gap-4 pointer-events-auto bg-black/50 backdrop-blur-md rounded-full border border-white/10 p-2">
+
                     <Button
                         size="icon"
                         variant="ghost"
@@ -157,11 +158,13 @@ export default function PresentationPage({ dayKey, copticDate, seasonLabel, sect
                         onClick={prevSlide}
                         disabled={currentSlideIndex === 0}
                     >
-                        <ChevronRight className="h-8 w-8" />
+                        <ChevronLeft className="h-8 w-8" />
                     </Button>
+
                     <span className="flex items-center px-4 font-mono text-xl text-zinc-500">
-                        {currentSlideIndex + 1} / {slides.length}
+                        {slides.length} / {currentSlideIndex + 1}
                     </span>
+
                     <Button
                         size="icon"
                         variant="ghost"
@@ -169,17 +172,9 @@ export default function PresentationPage({ dayKey, copticDate, seasonLabel, sect
                         onClick={nextSlide}
                         disabled={currentSlideIndex === slides.length - 1}
                     >
-                        <ChevronLeft className="h-8 w-8" />
+                        <ChevronRight className="h-8 w-8" />
                     </Button>
                 </div>
-            </div>
-
-            {/* Progress Bar */}
-            <div className="fixed bottom-0 left-0  h-1 bg-zinc-900 z-40">
-                <div
-                    className="h-full bg-amber-500 transition-all duration-300"
-                    style={{ width: `${((currentSlideIndex + 1) / slides.length) * 100}%` }}
-                />
             </div>
 
         </div>
