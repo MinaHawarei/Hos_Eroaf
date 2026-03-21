@@ -19,8 +19,8 @@
         </script>
 
         <style>
-            html { background-color: oklch(1 0 0); }
-            html.dark { background-color: oklch(0.145 0 0); }
+            html { background-color: #F5E6C8; }
+            html.dark { background-color: #121212; }
         </style>
 
         <title inertia>{{ config('app.name', 'هوس إيروف') }}</title>
@@ -32,7 +32,7 @@
         {{-- Coptic / Liturgical Appearance Fonts --}}
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-        <link href="https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400;1,700&family=Cairo:wght@400;500;600;700&family=Merriweather:ital,wght@0,300;0,400;0,700;1,300;1,400;1,700&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&display=swap" rel="stylesheet">
+        <link href="https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400;1,700&family=Cairo:wght@400;500;600;700&family=Merriweather:ital,wght@0,300;0,400;0,700;1,300;1,400;1,700&family=Noto+Sans+Coptic:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&display=swap" rel="stylesheet">
 
         @routes
         @viteReactRefresh

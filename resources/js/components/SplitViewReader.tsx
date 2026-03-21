@@ -9,15 +9,26 @@ interface SplitViewReaderProps {
     }>;
     hasCoptic: boolean;
     className?: string;
+    /** When true, text-align: justify is applied to Arabic/transliteration text */
+    justified?: boolean;
 }
 
-export function SplitViewReader({ lines, hasCoptic, className }: SplitViewReaderProps) {
+export function SplitViewReader({ lines, hasCoptic, className, justified = true }: SplitViewReaderProps) {
     // If no Coptic, just render Arabic lines centered
     if (!hasCoptic) {
         return (
-            <div className={cn("flex flex-col gap-6 text-center max-w-4xl mx-auto w-full", className)}>
+            <div className={cn("flex flex-col gap-8 max-w-5xl mx-auto w-full", className)}>
                 {lines.map((line, index) => (
-                    <p key={line.id || index} className="text-3xl md:text-5xl leading-relaxed text-foreground font-reading font-bold drop-shadow-sm">
+                    <p
+                        key={line.id || index}
+                        className={cn(
+                            "text-2xl md:text-4xl lg:text-5xl leading-[1.8] md:leading-[2] font-reading font-bold",
+                            "text-foreground drop-shadow-sm",
+                            "transition-all duration-300",
+                            justified ? "text-justified" : "text-center"
+                        )}
+                        dir="rtl"
+                    >
                         {line.text}
                     </p>
                 ))}
@@ -40,25 +51,45 @@ export function SplitViewReader({ lines, hasCoptic, className }: SplitViewReader
     }
 
     return (
-        <div className={cn("flex flex-col w-full max-w-7xl mx-auto gap-8", className)}>
+        <div className={cn("flex flex-col w-full max-w-7xl mx-auto gap-10", className)}>
             {pairedLines.map(([ar, cop], index) => (
-                <div key={index} className="flex flex-col md:flex-row gap-6 md:gap-12 relative items-center md:items-stretch">
+                <div
+                    key={index}
+                    className="flex flex-col md:flex-row gap-6 md:gap-10 relative items-start md:items-stretch slide-content-enter"
+                    style={{ animationDelay: `${index * 0.06}s` }}
+                >
                     {/* Arabic Column (Right in RTL) */}
-                    <div className="flex-1 text-center md:text-right">
+                    <div className="flex-1 flex items-center">
                         {ar && (
-                            <p className="text-3xl md:text-5xl leading-relaxed text-foreground font-reading font-bold drop-shadow-sm">
+                            <p
+                                className={cn(
+                                    "text-2xl md:text-4xl lg:text-5xl leading-[1.8] md:leading-[2]",
+                                    "text-foreground font-reading font-bold drop-shadow-sm",
+                                    "w-full transition-all duration-300",
+                                    justified ? "text-justified" : "text-center md:text-right"
+                                )}
+                                dir="rtl"
+                            >
                                 {ar.text}
                             </p>
                         )}
                     </div>
 
-                    {/* Divider text/decor */}
-                    <div className="hidden md:block w-px bg-border opacity-50 my-2 shadow-[0_0_10px_rgba(201,163,78,0.3)]" />
+                    {/* Decorative column divider */}
+                    <div className="hidden md:block column-divider" aria-hidden="true" />
 
-                    {/* Coptic Column (Left in RTL) */}
-                    <div className="flex-1 text-center md:text-right">
+                    {/* Coptic/Transliteration Column (Left in RTL) */}
+                    <div className="flex-1 flex items-center">
                         {cop && (
-                            <p className="text-3xl md:text-5xl leading-relaxed text-primary font-reading font-bold opacity-90 drop-shadow-sm">
+                            <p
+                                className={cn(
+                                    "text-2xl md:text-4xl lg:text-5xl leading-[1.8] md:leading-[2]",
+                                    "text-primary font-reading font-bold opacity-90 drop-shadow-sm",
+                                    "w-full transition-all duration-300",
+                                    justified ? "text-justified" : "text-center md:text-right"
+                                )}
+                                dir="rtl"
+                            >
                                 {cop.text}
                             </p>
                         )}

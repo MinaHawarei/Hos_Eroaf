@@ -17,7 +17,7 @@
 
     /* Decorative Coptic/reading font (Amiri/Playfair Display) */
     --font-reading:
-        'Amiri', 'Playfair Display',
+        'Amiri', 'Playfair Display', 'Noto Sans Coptic',
         serif;
 
     --font-serif:
@@ -290,4 +290,336 @@
         scrollbar-width: thin;
         scrollbar-color: hsl(38 80% 55% / 0.3) transparent;
     }
+
+    /* Justified text for Arabic and transliteration */
+    .text-justified {
+        text-align: justify;
+        text-align-last: center;
+        word-spacing: 0.05em;
+        hyphens: auto;
+    }
+}
+
+/* =========================================
+ *  PRESENTATION SYSTEM — Heritage Styling
+ * ========================================= */
+
+/* --- Presentation background --- */
+.presentation-bg {
+    position: relative;
+    background-color: var(--background);
+    min-height: 100vh;
+}
+
+.presentation-bg::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.06;
+    background-image:
+        radial-gradient(ellipse at 20% 50%, #C9A34E 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 20%, #8B2E2E 0%, transparent 40%),
+        radial-gradient(ellipse at 50% 80%, #C9A34E 0%, transparent 45%);
+}
+
+.dark .presentation-bg::before {
+    opacity: 0.04;
+}
+
+/* --- Section Header / Title Container --- */
+.slide-section-header {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    padding: 0.75rem 2.5rem;
+    border: 1.5px solid #C9A34E;
+    border-radius: 0.25rem;
+    background: linear-gradient(135deg,
+            rgba(201, 163, 78, 0.08) 0%,
+            rgba(245, 230, 200, 0.15) 50%,
+            rgba(201, 163, 78, 0.08) 100%);
+    font-family: var(--font-serif);
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--foreground);
+    letter-spacing: 0.05em;
+    text-align: center;
+}
+
+.dark .slide-section-header {
+    border-color: #D4AF37;
+    background: linear-gradient(135deg,
+            rgba(212, 175, 55, 0.1) 0%,
+            rgba(30, 26, 22, 0.3) 50%,
+            rgba(212, 175, 55, 0.1) 100%);
+}
+
+/* --- Coptic Cross Ornaments --- */
+.slide-section-header .ornament {
+    display: inline-block;
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+    opacity: 0.6;
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    /* Coptic cross ornament SVG */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg fill='%23C9A34E'%3E%3Crect x='42' y='5' width='16' height='90' rx='2'/%3E%3Crect x='5' y='42' width='90' height='16' rx='2'/%3E%3Crect x='38' y='1' width='24' height='8' rx='2'/%3E%3Crect x='38' y='91' width='24' height='8' rx='2'/%3E%3Crect x='1' y='38' width='8' height='24' rx='2'/%3E%3Crect x='91' y='38' width='8' height='24' rx='2'/%3E%3Ccircle cx='50' cy='50' r='8' fill='none' stroke='%23C9A34E' stroke-width='2'/%3E%3C/g%3E%3C/svg%3E");
+}
+
+.dark .slide-section-header .ornament {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg fill='%23D4AF37'%3E%3Crect x='42' y='5' width='16' height='90' rx='2'/%3E%3Crect x='5' y='42' width='90' height='16' rx='2'/%3E%3Crect x='38' y='1' width='24' height='8' rx='2'/%3E%3Crect x='38' y='91' width='24' height='8' rx='2'/%3E%3Crect x='1' y='38' width='8' height='24' rx='2'/%3E%3Crect x='91' y='38' width='8' height='24' rx='2'/%3E%3Ccircle cx='50' cy='50' r='8' fill='none' stroke='%23D4AF37' stroke-width='2'/%3E%3C/g%3E%3C/svg%3E");
+    opacity: 0.5;
+}
+
+/* --- Decorative horizontal rule --- */
+.ornamental-rule {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    width: 100%;
+    max-width: 300px;
+    margin: 0 auto;
+}
+
+.ornamental-rule::before,
+.ornamental-rule::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg,
+            transparent,
+            #C9A34E,
+            transparent);
+}
+
+.dark .ornamental-rule::before,
+.dark .ornamental-rule::after {
+    background: linear-gradient(90deg,
+            transparent,
+            #D4AF37,
+            transparent);
+}
+
+.ornamental-rule .ornament-diamond {
+    width: 8px;
+    height: 8px;
+    background: #C9A34E;
+    transform: rotate(45deg);
+    flex-shrink: 0;
+}
+
+.dark .ornamental-rule .ornament-diamond {
+    background: #D4AF37;
+}
+
+/* --- Slide Transition Animations --- */
+@keyframes slideEnter {
+    from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.98);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes slideExit {
+    from {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+
+    to {
+        opacity: 0;
+        transform: translateY(-10px) scale(0.99);
+    }
+}
+
+@keyframes fadeSlideUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.slide-enter {
+    animation: slideEnter 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.slide-exit {
+    animation: slideExit 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.slide-content-enter {
+    animation: fadeSlideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.15s both;
+}
+
+/* --- Responsive Slide Scaling --- */
+.slide-viewport {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: calc(100vh - 8rem);
+    padding: 2rem;
+    position: relative;
+    z-index: 1;
+}
+
+@media (min-width: 1920px) {
+    .slide-viewport {
+        transform: scale(1.1);
+        transform-origin: center center;
+    }
+}
+
+@media (min-width: 2560px) {
+    .slide-viewport {
+        transform: scale(1.25);
+        transform-origin: center center;
+    }
+}
+
+@media (max-width: 768px) {
+    .slide-viewport {
+        padding: 1rem;
+        min-height: calc(100vh - 6rem);
+    }
+}
+
+/* --- Presentation Toolbar --- */
+.pres-toolbar {
+    background: rgba(var(--card-rgb, 253 249 237), 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--border);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06), 0 1px 4px rgba(0, 0, 0, 0.04);
+    transition: all 0.3s ease;
+}
+
+.dark .pres-toolbar {
+    background: rgba(18, 18, 18, 0.85);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3), 0 1px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* --- Bottom Navigation Controls --- */
+.pres-nav-controls {
+    background: rgba(var(--card-rgb, 253 249 237), 0.8);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--border);
+    box-shadow: 0 -2px 20px rgba(0, 0, 0, 0.05);
+}
+
+.dark .pres-nav-controls {
+    background: rgba(18, 18, 18, 0.8);
+    border-color: rgba(59, 51, 43, 0.6);
+    box-shadow: 0 -2px 20px rgba(0, 0, 0, 0.3);
+}
+
+/* --- Text column divider --- */
+.column-divider {
+    width: 1px;
+    align-self: stretch;
+    background: linear-gradient(180deg,
+            transparent 0%,
+            var(--primary) 30%,
+            var(--primary) 70%,
+            transparent 100%);
+    opacity: 0.25;
+    margin-block: 0.5rem;
+}
+
+/* --- Intonation Badge --- */
+.intonation-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.35rem 1.25rem;
+    border-radius: 9999px;
+    font-family: var(--font-reading);
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--accent);
+    background: rgba(139, 46, 46, 0.07);
+    border: 1px solid rgba(139, 46, 46, 0.15);
+    letter-spacing: 0.02em;
+}
+
+.dark .intonation-badge {
+    color: #E8A4A3;
+    background: rgba(169, 68, 66, 0.12);
+    border-color: rgba(169, 68, 66, 0.2);
+}
+
+/* --- External Presentation Window --- */
+.external-pres-root {
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    background-color: var(--background);
+    color: var(--foreground);
+}
+
+/* --- Slide Progress Bar --- */
+.slide-progress {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: var(--border);
+    z-index: 50;
+}
+
+.slide-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary), var(--accent));
+    transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    border-radius: 0 2px 2px 0;
+}
+
+/* --- No scrollbar utility --- */
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+
+.no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+/* --- Heritage card surface --- */
+.heritage-surface {
+    background: linear-gradient(145deg,
+            rgba(253, 249, 237, 0.6) 0%,
+            rgba(245, 230, 200, 0.4) 100%);
+    border: 1px solid rgba(224, 207, 169, 0.5);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+.dark .heritage-surface {
+    background: linear-gradient(145deg,
+            rgba(30, 26, 22, 0.8) 0%,
+            rgba(18, 18, 18, 0.6) 100%);
+    border-color: rgba(59, 51, 43, 0.5);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.02);
 }
