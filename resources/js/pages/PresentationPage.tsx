@@ -139,7 +139,7 @@ export default function PresentationPage({ copticDate, seasonLabel, sections, sl
             <Head title={`عرض - ${copticDate}`} />
 
             {/* ═══════ Top Toolbar ═══════ */}
-            <div className={`fixed top-0 left-0 right-0 z-30 p-3 md:p-4 transition-all duration-500 ${isFullscreen ? 'opacity-0 hover:opacity-100' : ''}`}>
+            <div className={`fixed top-0 left-0 right-15 z-30 p-3 md:p-4 transition-all duration-500 ${isFullscreen ? 'opacity-0 hover:opacity-100' : ''}`}>
                 <div className="max-w-screen-xl mx-auto flex items-center justify-between">
 
                     {/* Left group: Exit + info */}
