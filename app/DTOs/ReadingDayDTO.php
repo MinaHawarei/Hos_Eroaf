@@ -16,6 +16,7 @@ class ReadingDayDTO
         public readonly string $copticMonthName,
         public readonly int $copticYear,
         public readonly string $copticFormatted,
+        public readonly int $copticDayIndex,
         public readonly string $season,
         public readonly string $seasonLabel,
         public readonly array $sections,

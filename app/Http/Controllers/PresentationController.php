@@ -9,104 +9,198 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use App\Services\ContentService;
 
 class PresentationController extends Controller
 {
     public function __construct(
-        private readonly ReadingResolverService $resolver,
+        private readonly ContentService $content,
     ) {}
 
-    public function show(Request $request, string $dayKey): \Illuminate\Http\RedirectResponse|\Inertia\Response
+    public function show(Request $request, string $dayKey)
     {
-        $readingDay = ReadingDay::where('date_key', $dayKey)->first();
+        try {
+            $dayData = $this->content->getByDayIndex($dayKey);
+        } catch (\Exception $e) {
+            return redirect()->route('home');
+        }
 
-        if (!$readingDay) {
-            // Try to resolve basic info so the frontend empty state has valid headers
-            try {
-                $dayData = $this->resolver->resolveForDate(Carbon::createFromFormat('Y-m-d', $dayKey));
-            } catch (\Exception $e) {
-                // If malformed, simply redirect to dashboard
-                return redirect()->route('home');
-            }
-
+        if (!$dayData) {
             return Inertia::render('PresentationPage', [
                 'dayKey' => $dayKey,
-                'copticDate' => $dayData->copticFormatted ?? '',
-                'seasonLabel' => $dayData->seasonLabel ?? '',
+                'copticDate' => '',
+                'seasonLabel' => '',
                 'sections' => [],
                 'slides' => [],
             ]);
         }
 
-        // Load all sections in order
-        $sections = ReadingSection::orderBy('order')
-            ->get()
-            ->map(function (ReadingSection $section) use ($readingDay) {
-                $readings = $readingDay->readings()
-                    ->where('section_id', $section->id)
-                    ->orderBy('sequence_order')
-                    ->with(['lines' => fn ($q) => $q->orderBy('line_order')])
-                    ->get();
+        $sectionsRaw = $dayData;
+        $copticDate = $sectionsRaw['Day'] ?? '';
+        unset($sectionsRaw['Day']);
+
+        // ✅ Transform sections - using title_ar from JSON
+        $sections = collect($sectionsRaw)
+            ->map(function ($items, $key) {
+                // Each section has an array of readings (usually one item)
+                $firstReading = $items[0] ?? null;
+
+                // Get section name from title_ar or use fallback
+                $sectionName = $firstReading['title_ar'] ?? $this->getDefaultSectionName($key);
 
                 return [
-                    'id' => $section->id,
-                    'code' => $section->code,
-                    'name_ar' => $section->name_ar,
-                    'readings' => $readings->map(fn ($r) => [
-                        'id' => $r->id,
-                        'title_ar' => $r->title_ar,
-                        'sequence_order' => $r->sequence_order,
-                        'has_coptic' => (bool) $r->has_coptic,
-                        'lines' => $r->lines->map(fn ($l) => [
-                            'id' => $l->id,
-                            'lang_type' => $l->lang_type,
-                            'line_order' => $l->line_order,
-                            'text' => $l->text,
-                            'normalized_text' => $l->normalized_text,
-                        ])->values(),
-                    ])->values(),
+                    'id' => $key,
+                    'code' => $key,
+                    'name_ar' => $sectionName,
+                    'readings' => collect($items)->map(function ($reading, $index) use ($sectionName) {
+                        // Build lines first to determine if has_coptic
+                        $lines = $this->buildLines($reading);
+                        $hasCoptic = collect($lines)->contains('lang_type', 'coptic_arabized');
+
+                        return [
+                            'id' => $index + 1,
+                            'title_ar' => $reading['title_ar'] ?? $sectionName,
+                            'intonation_ar' => $reading['intonation_ar'] ?? null, // ✅ إضافة intonation عربية
+                            'intonation_co' => $reading['intonation_co'] ?? null, // ✅ إضافة intonation قبطية
+                            'has_coptic' => $hasCoptic,
+                            'lines' => $lines,
+                        ];
+                    })->values(),
                 ];
             })
             ->filter(fn ($s) => $s['readings']->isNotEmpty())
             ->values();
 
-        // We build a flat array of 'slides' for the presentation
+        // ✅ Build slides using title_ar
         $slides = [];
-        foreach ($sections as $sectionIndex => $section) {
-            foreach ($section['readings'] as $readingIndex => $reading) {
-                // Determine has_coptic
-                $hasCoptic = $reading['has_coptic'];
-                if (!$hasCoptic) {
-                    // double check from lines
-                    foreach ($reading['lines'] as $line) {
-                        if ($line['lang_type'] === 'coptic_arabized') {
-                            $hasCoptic = true;
-                            break;
-                        }
-                    }
+        foreach ($sections as $section) {
+            foreach ($section['readings'] as $reading) {
+                // Ensure we have valid data
+                if (empty($reading['lines'])) {
+                    continue;
                 }
-                
+
+                $hasCoptic = collect($reading['lines'])->contains('lang_type', 'coptic_arabized');
+
                 $slides[] = [
                     'id' => "slide-{$section['code']}-{$reading['id']}",
                     'section_code' => $section['code'],
                     'section_name' => $section['name_ar'],
                     'title' => $reading['title_ar'],
+                    'intonation_ar' => $reading['intonation_ar'], // ✅ بدون قيمة افتراضية
+                    'intonation_co' => $reading['intonation_co'], // ✅ بدون قيمة افتراضية
                     'lines' => $reading['lines'],
                     'has_coptic' => $hasCoptic,
                 ];
             }
         }
 
-        $dayData = $this->resolver->resolveForDate(
-            Carbon::createFromFormat('Y-m-d', $readingDay->date_key) ?? Carbon::today()
-        );
+        // If no slides, show empty state
+        if (empty($slides)) {
+            return Inertia::render('PresentationPage', [
+                'dayKey' => $dayKey,
+                'copticDate' => $copticDate,
+                'seasonLabel' => '',
+                'sections' => [],
+                'slides' => [],
+            ]);
+        }
 
         return Inertia::render('PresentationPage', [
             'dayKey' => $dayKey,
-            'copticDate' => $dayData->copticFormatted,
-            'seasonLabel' => $dayData->seasonLabel,
-            'sections' => $sections, // For sidebar navigation
-            'slides' => $slides,     // Flat array for sequential next/prev
+            'copticDate' => $copticDate,
+            'seasonLabel' => $dayData['seasonLabel'] ?? $this->extractSeasonFromDate($copticDate),
+            'sections' => $sections,
+            'slides' => $slides,
         ]);
+    }
+
+    /**
+     * Build lines array from Arabic and Coptic text
+     */
+    private function buildLines(array $reading): array
+    {
+        $lines = [];
+        $lineOrder = 0;
+
+        $textAr = $reading['text_ar'] ?? [];
+        $textCo = $reading['text_co'] ?? [];
+
+        // Determine the maximum number of lines
+        $maxLines = max(count($textAr), count($textCo));
+
+        // Create lines in the format expected by SplitViewReader
+        for ($i = 0; $i < $maxLines; $i++) {
+            $arText = $textAr[$i] ?? '';
+            $coText = $textCo[$i] ?? '';
+
+            // If both exist, create two lines
+            if (!empty($arText) && !empty($coText)) {
+                // Arabic line
+                $lines[] = [
+                    'id' => $lineOrder++,
+                    'lang_type' => 'arabic',
+                    'text' => $arText,
+                ];
+
+                // Coptic line
+                $lines[] = [
+                    'id' => $lineOrder++,
+                    'lang_type' => 'coptic_arabized',
+                    'text' => $coText,
+                ];
+            }
+            // If only Arabic exists
+            elseif (!empty($arText)) {
+                $lines[] = [
+                    'id' => $lineOrder++,
+                    'lang_type' => 'arabic',
+                    'text' => $arText,
+                ];
+            }
+            // If only Coptic exists
+            elseif (!empty($coText)) {
+                $lines[] = [
+                    'id' => $lineOrder++,
+                    'lang_type' => 'coptic_arabized',
+                    'text' => $coText,
+                ];
+            }
+        }
+
+        return $lines;
+    }
+
+    /**
+     * Fallback section names in case title_ar is missing
+     */
+    private function getDefaultSectionName(string $key): string
+    {
+        return [
+            'vespers_psalm' => 'مزمور عشية',
+            'vespers_gospel' => 'إنجيل عشية',
+            'matins_psalm' => 'مزمور باكر',
+            'matins_gospel' => 'إنجيل باكر',
+            'pauline' => 'البولس',
+            'catholic' => 'الكاثوليكون',
+            'praxis' => 'الإبركسيس',
+            'synaxarium' => 'السنكسار',
+            'liturgy_psalm' => 'مزمور القداس',
+            'liturgy_gospel' => 'إنجيل القداس',
+        ][$key] ?? $key;
+    }
+
+    /**
+     * Extract season from Coptic date (you can enhance this)
+     */
+    private function extractSeasonFromDate(string $copticDate): string
+    {
+        // Simple extraction - you can make this more sophisticated
+        if (str_contains($copticDate, 'توت') || str_contains($copticDate, 'بابه') ||
+            str_contains($copticDate, 'هاتور') || str_contains($copticDate, 'كيهك')) {
+            return 'القطمارس السنوي';
+        }
+
+        return '';
     }
 }

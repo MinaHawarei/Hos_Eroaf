@@ -16,14 +16,23 @@ class DashboardController extends Controller
 
     public function __invoke(Request $request): Response
     {
-        $dateQuery = $request->query('date');
+
+        $dateQuery = $request->query('day');
+
+
         try {
-            $date = $dateQuery ? Carbon::createFromFormat('Y-m-d', $dateQuery) : Carbon::today();
+            // 1. تحديد التاريخ (إما المرسل أو اليوم)
+            $date = $dateQuery
+                ? Carbon::createFromFormat('Y-m-d', $dateQuery)
+                : Carbon::today();
+            $date->setTimeFrom(Carbon::now());
+
         } catch (\Exception $e) {
-            $date = Carbon::today();
+            $date = Carbon::now();
         }
 
         $dayData = $this->resolver->resolveForDate($date);
+
 
         return Inertia::render('Dashboard', [
             'copticDate' => [
@@ -35,8 +44,8 @@ class DashboardController extends Controller
             'gregorianDate' => $date->translatedFormat('l j F Y'),
             'season' => $dayData->season,
             'seasonLabel' => $dayData->seasonLabel,
-            'dayKey' => $dayData->dateKey,
-            'sections' => $dayData->sections,
+            'dayKey' => $dayData->copticDayIndex,
         ]);
     }
+
 }

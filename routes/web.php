@@ -3,6 +3,7 @@
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ReaderController;
 use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\PresentationController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -22,7 +23,7 @@ Route::get('/', DashboardController::class)->name('home');
 Route::get('/reader/{dayKey}', [ReaderController::class, 'show'])->name('reader.show');
 
 // Presentation — fullscreen presentation of liturgy
-Route::get('/presentation/{dayKey}', [App\Http\Controllers\PresentationController::class, 'show'])->name('presentation.show');
+Route::get('/presentation/{dayKey}', [PresentationController::class, 'show'])->name('presentation.show');
 
 // Settings
 Route::get('/settings', [SettingsController::class, 'index'])->name('settings');

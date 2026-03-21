@@ -34,7 +34,6 @@ type Props = {
     season: string;
     seasonLabel: string;
     dayKey: string;
-    sections: ReadingSection[];
 };
 
 // Map season keys to icons and colors
@@ -72,7 +71,6 @@ export default function Dashboard({
     season,
     seasonLabel,
     dayKey,
-    sections,
 }: Props) {
     const { setDateContext } = useDayContext();
     const currentSeasonStyle = useMemo(() => {
@@ -80,8 +78,8 @@ export default function Dashboard({
     }, [season]);
 
     useEffect(() => {
-        setDateContext(dayKey, copticDate.formatted, seasonLabel, sections);
-    }, [dayKey, copticDate.formatted, seasonLabel, sections, setDateContext]);
+        setDateContext(dayKey, copticDate.formatted, seasonLabel, []);
+    }, [dayKey, copticDate.formatted, seasonLabel, setDateContext]);
 
     return (
         <HosLayout title="قراءات اليوم">
@@ -123,44 +121,39 @@ export default function Dashboard({
                             <div className="pt-2">
                                 <DateSelector currentDate={dayKey} onDateChange={(d) => {
                                     localStorage.setItem('hos_selected_date', d);
-                                    router.visit(`/?date=${d}`);
+                                    router.visit(`/?day=${d}`);
                                 }} />
                             </div>
                         </div>
 
                         {/* Quick Actions */}
                         <div className="flex flex-col gap-2 justify-center">
-                            {sections.length > 0 ? (
-                                <>
-                                    <Link
-                                        href={`/reader/${dayKey}`}
-                                        className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:opacity-90 hover:shadow-md active:scale-[0.98]"
-                                    >
-                                        <BookOpen className="h-4 w-4" />
-                                        فتح القراءات
-                                    </Link>
+                             <>
+                                <Link
+                                    href={`#`}
+                                    className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:opacity-90 hover:shadow-md active:scale-[0.98]"
+                                >
+                                    <BookOpen className="h-4 w-4" />
+                                    فتح القراءات
+                                </Link>
 
-                                    <Link
-                                        href={`/presentation/${dayKey}`}
-                                        className="inline-flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400 px-4 py-2.5 text-sm font-semibold shadow-sm transition-all hover:bg-amber-500/20 active:scale-[0.98]"
-                                    >
-                                        <Sparkles className="h-4 w-4" />
-                                        عرض الكنيسة
-                                    </Link>
+                                <Link
+                                    href={`/presentation/${dayKey}`}
+                                    className="inline-flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400 px-4 py-2.5 text-sm font-semibold shadow-sm transition-all hover:bg-amber-500/20 active:scale-[0.98]"
+                                >
+                                    <Sparkles className="h-4 w-4" />
+                                    عرض الكنيسة
+                                </Link>
 
-                                    <Link
-                                        href={`/reader/${dayKey}?listen=true`}
-                                        className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground shadow-sm transition-all hover:bg-muted active:scale-[0.98]"
-                                    >
-                                        <Mic className="h-4 w-4" />
-                                        بدء الاستماع
-                                    </Link>
-                                </>
-                            ) : (
-                                <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm font-medium text-rose-700 dark:text-rose-400 max-w-xs text-center">
-                                    عذراً، لا توجد قراءات متاحة في هذا اليوم. يمكنك اختيار تاريخ آخر.
-                                </div>
-                            )}
+                                <Link
+                                    href={`#`}
+                                    className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground shadow-sm transition-all hover:bg-muted active:scale-[0.98]"
+                                >
+                                    <Mic className="h-4 w-4" />
+                                    بدء الاستماع
+                                </Link>
+                            </>
+
                         </div>
                     </div>
                 </div>
@@ -170,42 +163,101 @@ export default function Dashboard({
                     <h2 className="mb-4 text-lg font-semibold text-foreground">
                         أقسام القراءات
                     </h2>
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
 
-                    {sections.length > 0 ? (
-                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                            {sections.map((section) => (
-                                <Link
-                                    key={section.id}
-                                    href={`/reader/${dayKey}?section=${section.code}`}
-                                    className="group flex items-center gap-4 rounded-xl border border-border bg-card p-4 shadow-sm transition-all hover:border-primary/20 hover:shadow-md active:scale-[0.98]"
-                                >
-                                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
-                                        <BookOpen className="h-5 w-5" />
-                                    </div>
-                                    <div className="min-w-0 flex-1">
-                                        <h3 className="truncate text-sm font-semibold text-foreground">
-                                            {section.name_ar}
-                                        </h3>
-                                        <p className="mt-0.5 text-xs text-muted-foreground">
-                                            {section.reading_count}{' '}
-                                            {section.reading_count === 1 ? 'قراءة' : 'قراءات'}
-                                        </p>
-                                    </div>
-                                    <ChevronLeft className="h-4 w-4 shrink-0 text-muted-foreground/50 transition-transform group-hover:-translate-x-1 rtl:rotate-0" />
-                                </Link>
-                            ))}
-                        </div>
-                    ) : (
-                        <div className="rounded-xl border border-dashed border-border bg-muted/30 p-8 text-center">
-                            <BookOpen className="mx-auto h-10 w-10 text-muted-foreground/40" />
-                            <p className="mt-3 text-sm text-muted-foreground">
-                                لا توجد قراءات لهذا اليوم بعد
-                            </p>
-                            <p className="mt-1 text-xs text-muted-foreground/60">
-                                تحقق من التحديثات في الإعدادات
-                            </p>
-                        </div>
-                    )}
+                        <Link
+                            href={`/presentation/${dayKey}`}
+                            className="group flex items-center gap-4 rounded-xl border border-border bg-card p-4 shadow-sm transition-all hover:border-primary/20 hover:shadow-md active:scale-[0.98]"
+                        >
+                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
+                                <BookOpen className="h-5 w-5" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <h3 className="truncate text-sm font-semibold text-foreground">
+                                    القطمارس
+                                </h3>
+
+                            </div>
+                            <ChevronLeft className="h-4 w-4 shrink-0 text-muted-foreground/50 transition-transform group-hover:-translate-x-1 rtl:rotate-0" />
+                        </Link>
+                        <Link
+                            href={`/#`}
+                            className="group flex items-center gap-4 rounded-xl border border-border bg-card p-4 shadow-sm transition-all hover:border-primary/20 hover:shadow-md active:scale-[0.98]"
+                        >
+                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
+                                <BookOpen className="h-5 w-5" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <h3 className="truncate text-sm font-semibold text-foreground">
+                                    القداس الالهي
+                                </h3>
+
+                            </div>
+                            <ChevronLeft className="h-4 w-4 shrink-0 text-muted-foreground/50 transition-transform group-hover:-translate-x-1 rtl:rotate-0" />
+                        </Link>
+                        <Link
+                            href={`/#`}
+                            className="group flex items-center gap-4 rounded-xl border border-border bg-card p-4 shadow-sm transition-all hover:border-primary/20 hover:shadow-md active:scale-[0.98]"
+                        >
+                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
+                                <BookOpen className="h-5 w-5" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <h3 className="truncate text-sm font-semibold text-foreground">
+                                    رفع بخور عشية
+                                </h3>
+
+                            </div>
+                            <ChevronLeft className="h-4 w-4 shrink-0 text-muted-foreground/50 transition-transform group-hover:-translate-x-1 rtl:rotate-0" />
+                        </Link>
+                        <Link
+                            href={`/#`}
+                            className="group flex items-center gap-4 rounded-xl border border-border bg-card p-4 shadow-sm transition-all hover:border-primary/20 hover:shadow-md active:scale-[0.98]"
+                        >
+                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
+                                <BookOpen className="h-5 w-5" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <h3 className="truncate text-sm font-semibold text-foreground">
+                                    الاجبية
+                                </h3>
+
+                            </div>
+                            <ChevronLeft className="h-4 w-4 shrink-0 text-muted-foreground/50 transition-transform group-hover:-translate-x-1 rtl:rotate-0" />
+                        </Link>
+                        <Link
+                            href={`/#`}
+                            className="group flex items-center gap-4 rounded-xl border border-border bg-card p-4 shadow-sm transition-all hover:border-primary/20 hover:shadow-md active:scale-[0.98]"
+                        >
+                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
+                                <BookOpen className="h-5 w-5" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <h3 className="truncate text-sm font-semibold text-foreground">
+                                    تسبحة
+                                </h3>
+
+                            </div>
+                            <ChevronLeft className="h-4 w-4 shrink-0 text-muted-foreground/50 transition-transform group-hover:-translate-x-1 rtl:rotate-0" />
+                        </Link>
+                        <Link
+                            href={`/#`}
+                            className="group flex items-center gap-4 rounded-xl border border-border bg-card p-4 shadow-sm transition-all hover:border-primary/20 hover:shadow-md active:scale-[0.98]"
+                        >
+                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
+                                <BookOpen className="h-5 w-5" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <h3 className="truncate text-sm font-semibold text-foreground">
+                                    ترانيم
+                                </h3>
+
+                            </div>
+                            <ChevronLeft className="h-4 w-4 shrink-0 text-muted-foreground/50 transition-transform group-hover:-translate-x-1 rtl:rotate-0" />
+                        </Link>
+                    </div>
+
+
                 </div>
             </div>
         </HosLayout>

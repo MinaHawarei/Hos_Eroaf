@@ -12,6 +12,7 @@ interface Slide {
     id: string;
     section_code: string;
     section_name: string;
+    intonation_ar: string;
     title: string;
     lines: any[];
     has_coptic: boolean;
@@ -133,6 +134,9 @@ export default function PresentationPage({ dayKey, copticDate, seasonLabel, sect
                     <div className="mb-12 text-center text-amber-500/80 text-lg md:text-2xl font-serif tracking-widest border-b border-amber-500/20 pb-4 inline-block">
                         {currentSlide.section_name}
                     </div>
+                    <div className="mb-12 text-center text-amber-500/80 text-lg md:text-2xl font-serif tracking-widest border-b border-amber-500/20 pb-4 inline-block">
+                        {currentSlide.intonation_ar}
+                    </div>
 
                     <SplitViewReader
                         lines={currentSlide.lines}
@@ -171,7 +175,7 @@ export default function PresentationPage({ dayKey, copticDate, seasonLabel, sect
             </div>
 
             {/* Progress Bar */}
-            <div className="fixed bottom-0 left-0 right-0 h-1 bg-zinc-900 z-40">
+            <div className="fixed bottom-0 left-0  h-1 bg-zinc-900 z-40">
                 <div
                     className="h-full bg-amber-500 transition-all duration-300"
                     style={{ width: `${((currentSlideIndex + 1) / slides.length) * 100}%` }}

@@ -9,63 +9,43 @@ use Carbon\Carbon;
 
 /**
  * Resolves the liturgical reading day for a given Gregorian date.
- *
- * Responsibilities:
- * 1. Convert Gregorian date → Coptic date (offline)
- * 2. Determine liturgical season and date key
- * 3. Fetch reading sections from the database
- * 4. Return a ReadingDayDTO
  */
 class ReadingResolverService
 {
-    /**
-     * Coptic month names in Arabic.
-     */
     private const COPTIC_MONTHS = [
-        1  => 'توت',
-        2  => 'بابه',
-        3  => 'هاتور',
-        4  => 'كيهك',
-        5  => 'طوبة',
-        6  => 'أمشير',
-        7  => 'برمهات',
-        8  => 'برمودة',
-        9  => 'بشنس',
-        10 => 'بؤونة',
-        11 => 'أبيب',
-        12 => 'مسرى',
-        13 => 'نسيء',        // Epagomenal / Nasie (5-6 extra days)
+        1  => 'توت', 2  => 'بابه', 3  => 'هاتور', 4  => 'كيهك',
+        5  => 'طوبة', 6  => 'أمشير', 7  => 'برمهات', 8  => 'برمودة',
+        9  => 'بشنس', 10 => 'بؤونة', 11 => 'أبيب', 12 => 'مسرى',
+        13 => 'نسيء',
     ];
 
-    /**
-     * Season labels in Arabic.
-     */
     private const SEASON_LABELS = [
-        'annual'      => 'السنوي',
-        'great_lent'  => 'الصوم الكبير',
-        'holy_week'   => 'أسبوع الآلام',
-        'pentecost'   => 'الخماسين المقدسة',
-        'jonah_fast'  => 'صوم يونان',
+        'annual'        => 'السنوي',
+        'great_lent'    => 'الصوم الكبير',
+        'holy_week'     => 'أسبوع الآلام',
+        'easter'     => 'عيد القيامة',
+        'pentecost'     => 'الخماسين المقدسة',
+        'jonah_fast'    => 'صوم يونان',
         'apostles_fast' => 'صوم الرسل',
         'nativity_fast' => 'صوم الميلاد',
-        'advent'      => 'الميلاد',
+        'advent'        => 'عيدالميلاد',
     ];
 
-    /**
-     * Resolve reading data for a given date.
-     */
     public function resolveForDate(Carbon $date): ReadingDayDTO
     {
-        // Step 1: Convert to Coptic date
-        [$copticDay, $copticMonth, $copticYear] = $this->gregorianToCoptic($date);
+        // --- التعديل الجديد: إذا كانت الساعة 6 مساءً أو أكثر، ننتقل لليوم التالي كنسياً ---
+        $targetDate = $date->copy();
+        if ($targetDate->hour >= 18) {
+            $targetDate->addDay();
+        }
 
-        // Step 2: Determine season
-        $season = $this->determineSeason($date, $copticDay, $copticMonth);
+        $targetDate->startOfDay();
 
-        // Step 3: Build date key (Gregorian for lookup)
-        $dateKey = $date->format('Y-m-d');
+        [$copticDay, $copticMonth, $copticYear] = $this->gregorianToCoptic($targetDate);
+        $copticDayIndex = $this->getCopticDayIndex($copticDay, $copticMonth);
+        $season = $this->determineSeason($targetDate, $copticDay, $copticMonth);
+        $dateKey = $targetDate->format('Y-m-d');
 
-        // Step 4: Fetch sections with reading counts
         $readingDay = ReadingDay::where('date_key', $dateKey)->first();
 
         $sections = [];
@@ -98,82 +78,60 @@ class ReadingResolverService
             copticMonthName: $monthName,
             copticYear: $copticYear,
             copticFormatted: "{$copticDay} {$monthName} {$copticYear} ش",
+            copticDayIndex: $copticDayIndex,
             season: $season,
             seasonLabel: self::SEASON_LABELS[$season] ?? 'السنوي',
             sections: $sections,
         );
     }
 
-    /**
-     * Convert a Gregorian date to Coptic date.
-     *
-     * The Coptic calendar starts on September 11 (or 12 in a Gregorian leap year).
-     * Year 1 AM (Anno Martyrum) = 284 AD.
-     *
-     * Algorithm:
-     * - Calculate total days since a reference point.
-     * - The Coptic year has 12 months of 30 days + 1 month of 5/6 days.
-     *
-     * @return array{0: int, 1: int, 2: int} [day, month, year]
-     */
-    public function gregorianToCoptic(Carbon $date): array
+    private function getCopticDayIndex(int $day, int $month): int
     {
-        // Julian Day Number calculation for the Gregorian date
-        $jdn = $this->gregorianToJDN($date->year, $date->month, $date->day);
-
-        // Coptic epoch: 1 Tout 1 AM = August 29, 284 AD (Julian) = JDN 1825030
-        // But we need to use the proleptic Julian correlation.
-        // The Coptic calendar epoch in JDN is 1825030 (August 29, 0284 Julian).
-        $copticEpoch = 1825030;
-
-        // Days since Coptic epoch
-        $daysSinceEpoch = $jdn - $copticEpoch;
-
-        // Each Coptic 4-year cycle = 1461 days (365*3 + 366)
-        $cycle = intdiv($daysSinceEpoch, 1461);
-        $remainder = $daysSinceEpoch % 1461;
-
-        // Fix for negative remainders
-        if ($remainder < 0) {
-            $cycle--;
-            $remainder += 1461;
+        $daysBeforeMonth = ($month - 1) * 30;
+        if ($month > 12) {
+            $daysBeforeMonth = 360;
         }
-
-        $year = $cycle * 4;
-
-        if ($remainder < 366) {
-            // First year of cycle (leap year)
-            $dayOfYear = $remainder;
-        } else {
-            $remainder -= 366;
-            $year++;
-            $extraYears = intdiv($remainder, 365);
-            $dayOfYear = $remainder % 365;
-            $year += $extraYears;
-        }
-
-        // Year is 0-indexed from epoch, add 1 for 1-based year
-        $year += 1;
-
-        // Month (each month = 30 days, except month 13 = 5 or 6 days)
-        $month = intdiv($dayOfYear, 30) + 1;
-        $day = $dayOfYear % 30 + 1;
-
-        // Cap month to 13
-        if ($month > 13) {
-            $month = 13;
-            $day = $dayOfYear - 360 + 1;
-        }
-
-        return [$day, $month, $year];
+        return $daysBeforeMonth + $day;
     }
 
-    /**
-     * Convert Gregorian date to Julian Day Number.
-     */
+    public function gregorianToCoptic(Carbon $date): array
+    {
+        $jdn = $this->gregorianToJDN($date->year, $date->month, $date->day);
+        $copticEpochJDN = 1825030;
+        $daysSinceEpoch = $jdn - $copticEpochJDN;
+
+        $cycles = intdiv($daysSinceEpoch, 1461);
+        $remainingDays = $daysSinceEpoch % 1461;
+
+        if ($remainingDays < 365) {
+            $yearInCycle = 0;
+            $dayOfYear = $remainingDays;
+        } elseif ($remainingDays < 730) {
+            $yearInCycle = 1;
+            $dayOfYear = $remainingDays - 365;
+        } elseif ($remainingDays < 1095) {
+            $yearInCycle = 2;
+            $dayOfYear = $remainingDays - 730;
+        } else {
+            $yearInCycle = 3;
+            $dayOfYear = $remainingDays - 1095;
+        }
+
+        $copticYear = ($cycles * 4) + $yearInCycle + 1;
+
+        if ($dayOfYear < 360) {
+            $copticMonth = intdiv($dayOfYear, 30) + 1;
+            $copticDay = ($dayOfYear % 30) + 1;
+        } else {
+            $copticMonth = 13;
+            $copticDay = $dayOfYear - 360 + 1;
+        }
+
+        return [$copticDay, $copticMonth, $copticYear];
+    }
+
     private function gregorianToJDN(int $year, int $month, int $day): int
     {
-        // Algorithm from Meeus, "Astronomical Algorithms"
         $a = intdiv(14 - $month, 12);
         $y = $year + 4800 - $a;
         $m = $month + 12 * $a - 3;
@@ -188,108 +146,87 @@ class ReadingResolverService
     }
 
     /**
-     * Calculate the date of Orthodox (Coptic) Easter for a given year.
-     *
-     * Uses the Julian computus (Meeus algorithm) then converts to Gregorian.
-     *
-     * @param int $year Gregorian year
-     * @return Carbon
+     * يحسب عيد القيامة وفقاً للتقويم الغريغوري (الموحد العالمي).
+     * هذه الخوارزمية تضمن أن يكون العيد يوم 5 أبريل في عام 2026.
      */
-    public function orthodoxEaster(int $year): Carbon
+    public function calculateEaster(int $year): Carbon
     {
-        // Julian computus
-        $a = $year % 4;
-        $b = $year % 7;
-        $c = $year % 19;
-        $d = (19 * $c + 15) % 30;
-        $e = (2 * $a + 4 * $b - $d + 34) % 7;
+        // PHP built-in function to calculate Gregorian Easter
+        $daysAfterMarch21 = easter_days($year);
 
-        $month = intdiv($d + $e + 114, 31);  // 3 = March, 4 = April (Julian)
-        $day = (($d + $e + 114) % 31) + 1;
-
-        // Convert Julian to Gregorian by adding the century correction
-        // For 1900-2099: +13 days
-        // For 2100-2199: +14 days
-        $centuryCorrection = 13;
-        if ($year >= 2100) {
-            $centuryCorrection = 14;
-        }
-
-        // Create the Julian date and add correction
-        $easterJulian = Carbon::createFromDate($year, $month, $day);
-        $easterGregorian = $easterJulian->addDays($centuryCorrection);
-
-        return $easterGregorian;
+        // Easter is calculated from March 21
+        return Carbon::createFromDate($year, 3, 21)->addDays($daysAfterMarch21);
     }
 
-    /**
-     * Determine the liturgical season for a given date.
-     *
-     * Season rules:
-     * - Jonah Fast: 3 days, starts Monday 2 weeks before Great Lent
-     * - Great Lent: 55 days before Easter (including Holy Week)
-     * - Holy Week: last 7 days of Great Lent
-     * - Pentecost (Khamsin): 50 days after Easter
-     * - Apostles Fast: day after Pentecost until Epib 5 (July 12)
-     * - Nativity Fast: Hatour 16 (Nov 25) to Kiahk 29 (Jan 7)
-     * - Annual: everything else
-     */
     public function determineSeason(Carbon $date, int $copticDay, int $copticMonth): string
     {
         $year = $date->year;
-        $easter = $this->orthodoxEaster($year);
 
-        // Days relative to Easter
-        $daysFromEaster = $date->diffInDays($easter, false);
-        // Negative = before Easter, positive = after Easter
+        // استخدام دالة حساب العيد الجديدة
+        $easter = $this->calculateEaster($year);
 
-        // If date is early in the year and Easter is later
-        $diffToEaster = $easter->diffInDays($date, false);
+        // إذا كان التاريخ الحالي بعد عيد القيامة أو يساويه (لأن العيد نفسه يعتبر بداية الخماسين)
+        if ($date->gte($easter)) {
+            $daysAfterEaster = $easter->diffInDays($date);
 
-        // Holy Week: 7 days before Easter (Palm Sunday to Easter Eve)
-        if ($diffToEaster >= 0 && $diffToEaster <= 6) {
-            return 'holy_week';
+            // الخماسين المقدسة: 50 يوماً تبدأ من يوم العيد (اليوم 0) حتى 49 يوماً بعده
+            if ($daysAfterEaster >= 0 && $daysAfterEaster <= 49) {
+                return 'pentecost';
+            }
+
+            // صوم الرسل: يبدأ من اليوم 50 بعد العيد (الإثنين) حتى 12 يوليو (أو 5 أبيب)
+            $apostlesFastEnd = Carbon::createFromDate($year, 7, 12);
+            if ($daysAfterEaster >= 50 && $date->lte($apostlesFastEnd)) {
+                return 'apostles_fast';
+            }
+        }
+        // إذا كان التاريخ الحالي قبل عيد القيامة
+        else {
+            //$daysBeforeEaster = $date->diffInDays($easter);
+            $daysBeforeEaster = (int) $date->diffInDays($easter);
+
+            if ($daysBeforeEaster == 0) {
+                return 'easter';
+            }
+            // أسبوع الآلام: آخر 6 أيام قبل العيد (من الإثنين إلى السبت)
+
+            if ($daysBeforeEaster >= 1 && $daysBeforeEaster <= 6) {
+                return 'holy_week';
+            }
+
+            // الصوم الكبير: 55 يوماً قبل العيد (شاملة أسبوع الآلام).
+            // إذن، الصوم يقع بين 7 أيام و55 يوماً قبل العيد.
+            if ($daysBeforeEaster >= 7 && $daysBeforeEaster <= 55) {
+                return 'great_lent';
+            }
+
+            // صوم يونان: 3 أيام. يبدأ يوم الإثنين، قبل الصوم الكبير بأسبوعين.
+            // حسابياً: 55 (صوم كبير) + 14 (أسبوعين) = 69 يوماً قبل العيد.
+            // إذن صوم يونان يقع بين 67 و 69 يوماً قبل العيد.
+            if ($daysBeforeEaster >= 67 && $daysBeforeEaster <= 69) {
+                return 'jonah_fast';
+            }
         }
 
-        // Great Lent: 55 days before Easter (minus Holy Week = days 7..55 before Easter)
-        if ($diffToEaster >= 7 && $diffToEaster <= 55) {
-            return 'great_lent';
-        }
-
-        // Jonah Fast: 3 days, starting Monday 2 weeks before Great Lent
-        // Great Lent start = Easter - 55 days
-        $greatLentStart = $easter->copy()->subDays(55);
-        $jonahStart = $greatLentStart->copy()->subDays(14); // 2 weeks before
-        $jonahEnd = $jonahStart->copy()->addDays(2); // 3 days
-
-        if ($date->between($jonahStart, $jonahEnd)) {
-            return 'jonah_fast';
-        }
-
-        // Pentecost: 50 days after Easter
-        if ($diffToEaster < 0 && abs($diffToEaster) <= 50) {
-            return 'pentecost';
-        }
-
-        // Apostles Fast: day after Pentecost to Epib 5 (July 12 Gregorian)
-        $pentecostEnd = $easter->copy()->addDays(50);
-        $apostlesFastEnd = Carbon::createFromDate($year, 7, 12);
-        if ($date->gt($pentecostEnd) && $date->lte($apostlesFastEnd)) {
-            return 'apostles_fast';
-        }
-
-        // Nativity Fast: approx Nov 25 to Jan 7
-        $nativityFastStart = Carbon::createFromDate($year, 11, 25);
-        $nativityFastEnd = Carbon::createFromDate($year + 1, 1, 7);
-        if ($date->gte($nativityFastStart) && $date->lte($nativityFastEnd)) {
+        // صوم الميلاد: ثابت تقريباً من 25 نوفمبر حتى 6 يناير
+        // نغطي شهري نوفمبر وديسمبر
+        if ($date->month === 11 && $date->day >= 25) {
             return 'nativity_fast';
         }
-        // Check if we're in Jan 1-7 of the current year (end of previous year's fast)
-        $prevNativityEnd = Carbon::createFromDate($year, 1, 7);
-        if ($date->lte($prevNativityEnd) && $date->month === 1) {
+        if ($date->month === 12) {
+            return 'nativity_fast';
+        }
+        // ونغطي شهر يناير حتى يوم 6
+        if ($date->month === 1 && $date->day <= 6) {
             return 'nativity_fast';
         }
 
+        // عيد الميلاد المجيد (7 يناير)
+        if ($date->month === 1 && $date->day === 7) {
+             return 'advent';
+        }
+
+        // الأيام العادية
         return 'annual';
     }
 }
