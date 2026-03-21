@@ -29,46 +29,57 @@ class ContentService
     /**
      * دالة دمج ملفات القداس بتنسيق مرقم
      */
-    public function getLiturgy(string|int $day): ?array
+    public function getLiturgy(int $day , string $dayName ,string $season): ?array
     {
         $file = str_pad($day, 3, '0', STR_PAD_LEFT) . '.json';
-
+        $FastingDays = ['الأربعاء', 'الجمعة'];
+        $FastingSeasons = ['apostles_fast', 'nativity_fast', 'jonah_fast', 'great_lent'];
         // قائمة الملفات بالترتيب الذي تريده
-        // المفتاح هو اسم المجلد، والقيمة هي التسمية التي ستظهر في الكود النهائي
         $fileConfigs = [
-            'ellison emas',
-            'ellison emas - Copy',
-
+            "ellison_emas" =>'ellison emas',
+            "our_father"=>'ابانا الذي في السموات',
+            "aliloia_fay_be" =>'الليلويا فاي بي',
         ];
+
+
+        $isGreatLentSunday = ($season === 'great_lent' && $dayName === 'الأحد');
+
+        $isRegularFastingDay = in_array($season, $FastingSeasons)
+                            && in_array($dayName, $FastingDays)
+                            && $season !== 'pentecost';
+
+        if ($isGreatLentSunday || $isRegularFastingDay) {
+                $fileConfigs["aliloia_fay_be"] = 'الليلويا جي افمفئي';
+
+        }else if( in_array($season , $FastingSeasons)){
+            $fileConfigs["aliloia_fay_be"] = 'الليلويا إي إ';
+        }
 
         $combinedData = [];
         $counter = 1;
 
-        foreach ($fileConfigs as $file) {
-            $path = base_path("content/liturgy/{$file}.json");
+        foreach ($fileConfigs as $configKey => $fileName) {
+            $path = base_path("content/liturgy/{$fileName}.json");
 
             if (file_exists($path)) {
-                $content = json_decode(file_get_contents($path), true);
+                $fileContent = json_decode(file_get_contents($path), true);
 
-                if ($content) {
-                    // بناء المفتاح الجديد مثل: 1_ellison_emas
-                    $newKey = "{$counter}_{$content['code']}";
+                if ($fileContent) {
+                    // استخدام الـ code الموجود داخل ملف الـ json أو الـ configKey
+                    $slug = $fileContent['code'] ?? $configKey;
+                    $newKey = "{$counter}_{$slug}";
 
-                    // نضع المحتوى داخل المفتاح المرقم
-                    // مع الاحتفاظ بـ title و style و content من الملف الأصلي
                     $combinedData[$newKey] = [
-                        "title"   => $content['title'] ?? '',
-                        "style"   => $content['style'] ?? 1,
-                        "content" => $content['content'] ?? []
+                        "title"   => $fileContent['title'] ?? '',
+                        "style"   => $fileContent['style'] ?? 1,
+                        "content" => $fileContent['content'] ?? []
                     ];
 
                     $counter++;
                 }
             }
         }
-        //dd($combinedData);
 
         return !empty($combinedData) ? $combinedData : null;
     }
-
 }

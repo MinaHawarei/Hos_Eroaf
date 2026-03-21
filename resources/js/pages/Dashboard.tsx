@@ -35,6 +35,7 @@ type Props = {
     season: string;
     seasonLabel: string;
     dayKey: string;
+    dayName: string;
 };
 
 // Map season keys to icons and colors
@@ -72,6 +73,7 @@ export default function Dashboard({
     season,
     seasonLabel,
     dayKey,
+    dayName
 }: Props) {
     const { setDateContext } = useDayContext();
     const currentSeasonStyle = useMemo(() => {
@@ -217,7 +219,13 @@ export default function Dashboard({
 
                             <div className="flex items-center gap-1 w-full sm:w-auto shrink-0 border-t sm:border-t-0 pt-3 sm:pt-0">
                                 <Link
-                                    href={`/presentation/liturgy/${dayKey}`}
+                                    href={`/presentation/liturgy`}
+                                    data={{
+                                        season: {season} ,
+                                        dayName: {dayName},
+                                        dayKey: {dayKey}
+                                    }}
+
                                     className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400 px-2 py-2 text-sm font-bold shadow-sm transition-all hover:bg-amber-500/20 active:scale-[0.96]"
                                 >
                                     <Monitor className="h-4 w-4" />

@@ -15,7 +15,7 @@ Route::get('/', DashboardController::class)->name('home');
 // Presentation — fullscreen presentation of liturgy
 Route::prefix('presentation')->group(function () {
     Route::get('/lectionary/{dayKey}', [PresentationController::class, 'lectionary'])->name('presentation.lectionary');
-    Route::get('/liturgy/{dayKey}', [PresentationController::class, 'liturgy'])->name('presentation.liturgy');
+    Route::get('/liturgy', [PresentationController::class, 'liturgy'])->name('presentation.liturgy');
 });
 Route::get('/presentation/{dayKey}', [PresentationController::class, 'lectionary '])->name('presentation.show');
 

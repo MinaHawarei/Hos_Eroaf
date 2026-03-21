@@ -30,10 +30,12 @@ class DashboardController extends Controller
         } catch (\Exception $e) {
             $date = Carbon::now();
         }
-
-        $dayData = $this->resolver->resolveForDate($date);
-
-
+        $targetDate = $date->copy();
+        if ($targetDate->hour >= 18) {
+            $targetDate->addDay();
+        }
+        $dayData = $this->resolver->resolveForDate($targetDate);
+        //dd($date->translatedFormat('l'));
         return Inertia::render('Dashboard', [
             'copticDate' => [
                 'day' => $dayData->copticDay,
@@ -42,6 +44,7 @@ class DashboardController extends Controller
                 'formatted' => $dayData->copticFormatted,
             ],
             'gregorianDate' => $date->translatedFormat('l j F Y'),
+            'dayName' => $date->translatedFormat('l'),
             'season' => $dayData->season,
             'seasonLabel' => $dayData->seasonLabel,
             'dayKey' => $dayData->copticDayIndex,

@@ -33,18 +33,14 @@ class ReadingResolverService
 
     public function resolveForDate(Carbon $date): ReadingDayDTO
     {
-        // --- التعديل الجديد: إذا كانت الساعة 6 مساءً أو أكثر، ننتقل لليوم التالي كنسياً ---
-        $targetDate = $date->copy();
-        if ($targetDate->hour >= 18) {
-            $targetDate->addDay();
-        }
 
-        $targetDate->startOfDay();
 
-        [$copticDay, $copticMonth, $copticYear] = $this->gregorianToCoptic($targetDate);
+        $date->startOfDay();
+
+        [$copticDay, $copticMonth, $copticYear] = $this->gregorianToCoptic($date);
         $copticDayIndex = $this->getCopticDayIndex($copticDay, $copticMonth);
-        $season = $this->determineSeason($targetDate, $copticDay, $copticMonth);
-        $dateKey = $targetDate->format('Y-m-d');
+        $season = $this->determineSeason($date, $copticDay, $copticMonth);
+        $dateKey = $date->format('Y-m-d');
 
         $readingDay = ReadingDay::where('date_key', $dateKey)->first();
 

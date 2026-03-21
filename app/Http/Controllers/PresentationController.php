@@ -45,7 +45,7 @@ class PresentationController extends Controller
                 $firstReading = $items[0] ?? null;
 
                 // Get section name from title_ar or use fallback
-                $sectionName = $firstReading['title_ar'] ?? $this->getDefaultSectionName($key);
+                $sectionName = $firstReading['title_ar'] ;
 
                 return [
                     'id' => $key,
@@ -113,155 +113,141 @@ class PresentationController extends Controller
             'slides' => $slides,
         ]);
     }
-public function liturgy(Request $request, string $dayKey, ContentService $content)
-{
-    try {
-        $Data = $content->getLiturgy($dayKey);
-    } catch (\Exception $e) {
-        return redirect()->route('home');
-    }
+    public function liturgy(Request $request, ContentService $content)
+    {
+        $dayKey  = (int)$request->input('dayKey.dayKey');
+        $dayName = $request->input('dayName.dayName');
+        $season  = $request->input('season.season');
 
-    if (!$Data) {
-        return Inertia::render('PresentationPage', [
-            'dayKey' => $dayKey,
-            'copticDate' => '',
-            'sections' => [],
-            'slides' => [],
-        ]);
-    }
-
-    // ✅ تحويل البيانات مع دمج المتحدثين في كل قسم
-    $sections = collect($Data)->map(function ($sectionData, $key) {
-        $items = $sectionData['content'] ?? [];
-        $sectionTitle = $sectionData['title'] ?? $this->getDefaultSectionName($key);
-
-        // --- التعديل الجوهري هنا: دمج كل الأسطر من جميع المتحدثين في مصفوفة واحدة ---
-        $allLinesInOneReading = [];
-        foreach ($items as $readingPart) {
-            // نستخدم دالتك buildLines لجلب أسطر هذا المتحدث
-            $partLines = $this->buildLines($readingPart);
-            // ندمجها مع المصفوفة الكبيرة للقسم
-            $allLinesInOneReading = array_merge($allLinesInOneReading, $partLines);
+        try {
+            $Data = $content->getLiturgy($dayKey, $dayName, $season);
+        } catch (\Exception $e) {
+            return redirect()->route('home');
         }
 
-        $hasCoptic = collect($allLinesInOneReading)->contains('lang_type', 'coptic_arabized');
+        if (!$Data) {
+            return Inertia::render('PresentationPage', [
+                'dayKey' => $dayKey,
+                'copticDate' => '',
+                'sections' => [],
+                'slides' => [],
+            ]);
+        }
 
-        return [
-            'id' => $key,
-            'code' => $key,
-            'name_ar' => $sectionTitle,
-            'readings' => [
-                [
-                    'id' => 1, // دائماً واحد لأننا دمجناهم
-                    'title_ar' => $sectionTitle,
-                    'intonation_ar' => null,
-                    'has_coptic' => $hasCoptic,
-                    'lines' => $allLinesInOneReading, // الأسطر المدمجة
-                    'style' => 1,
-                ]
-            ],
-        ];
-    })->values();
+        // ✅ تحويل البيانات مع دمج المتحدثين في كل قسم
+        $sections = collect($Data)->map(function ($sectionData, $key) {
+            $items = $sectionData['content'] ?? [];
+            $sectionTitle = $sectionData['title'] ;
 
-    // ✅ بناء السلايدات (كل قسم سيصبح Slide واحدة الآن)
-    $slides = [];
-    foreach ($sections as $section) {
-        // بما أن كل قسم لديه مصفوفة readings فيها عنصر واحد فقط الآن
-        $reading = $section['readings'][0];
+            // --- التعديل الجوهري هنا: دمج كل الأسطر من جميع المتحدثين في مصفوفة واحدة ---
+            $allLinesInOneReading = [];
+            foreach ($items as $readingPart) {
+                // نستخدم دالتك buildLines لجلب أسطر هذا المتحدث
+                $partLines = $this->buildLines($readingPart);
+                // ندمجها مع المصفوفة الكبيرة للقسم
+                $allLinesInOneReading = array_merge($allLinesInOneReading, $partLines);
+            }
 
-        if (empty($reading['lines'])) continue;
+            $hasCoptic = collect($allLinesInOneReading)->contains('lang_type', 'coptic_arabized');
 
-        $slides[] = [
-            'id' => "slide-{$section['code']}",
-            'section_code' => $section['code'],
-            'section_name' => $section['name_ar'],
-            'title' => $reading['title_ar'],
-            'intonation_ar' => null,
-            'lines' => $reading['lines'],
-            'has_coptic' => $reading['has_coptic'],
-        ];
+            return [
+                'id' => $key,
+                'code' => $key,
+                'name_ar' => $sectionTitle,
+                'readings' => [
+                    [
+                        'id' => 1, // دائماً واحد لأننا دمجناهم
+                        'title_ar' => $sectionTitle,
+                        'intonation_ar' => null,
+                        'has_coptic' => $hasCoptic,
+                        'lines' => $allLinesInOneReading, // الأسطر المدمجة
+                        'style' => 1,
+                    ]
+                ],
+            ];
+        })->values();
+
+        // ✅ بناء السلايدات (كل قسم سيصبح Slide واحدة الآن)
+        $slides = [];
+        foreach ($sections as $section) {
+            // بما أن كل قسم لديه مصفوفة readings فيها عنصر واحد فقط الآن
+            $reading = $section['readings'][0];
+
+            if (empty($reading['lines'])) continue;
+
+            $slides[] = [
+                'id' => "slide-{$section['code']}",
+                'section_code' => $section['code'],
+                'section_name' => $section['name_ar'],
+                'title' => $reading['title_ar'],
+                'intonation_ar' => null,
+                'lines' => $reading['lines'],
+                'has_coptic' => $reading['has_coptic'],
+            ];
+        }
+
+        return Inertia::render('PresentationPage', [
+            'dayKey' => $dayKey,
+            'sections' => $sections,
+            'slides' => $slides,
+        ]);
     }
-
-    return Inertia::render('PresentationPage', [
-        'dayKey' => $dayKey,
-        'sections' => $sections,
-        'slides' => $slides,
-    ]);
-}
 
     /**
      * Build lines array from Arabic and Coptic text
      */
-private function buildLines(array $reading): array
-{
-    $lines = [];
-    $lineOrder = 0;
-    // جلب القائل (الكاهن، الشعب، إلخ)
-    $speaker = $reading['speaker'] ?? null;
-
-    $textAr = $reading['text_ar'] ?? [];
-    $textCo = $reading['text_co'] ?? [];
-    $textArCo = $reading['text_ar_co'] ?? [];
-
-    $maxLines = max(count($textAr), count($textCo), count($textArCo));
-
-    for ($i = 0; $i < $maxLines; $i++) {
-        $arText = $textAr[$i] ?? '';
-        $coText = $textCo[$i] ?? '';
-        $arCoText = $textArCo[$i] ?? '';
-
-        // نرسل الـ speaker مع أول سطر فقط في المجموعة أو مع كل الأسطر حسب تفضيلك
-        // هنا سأرسله مع كل سطر ليتمكن الـ Frontend من معرفة صاحب النص
-
-        if (!empty($arText)) {
-            $lines[] = [
-                'id' => $lineOrder++,
-                'lang_type' => 'arabic',
-                'text' => $arText,
-                'speaker' => $speaker // إدراج القائل هنا
-            ];
-        }
-
-        if (!empty($arCoText)) {
-            $lines[] = [
-                'id' => $lineOrder++,
-                'lang_type' => 'coptic_arabized',
-                'text' => $arCoText,
-                'speaker' => $speaker
-            ];
-        }
-
-        if (!empty($coText)) {
-            $lines[] = [
-                'id' => $lineOrder++,
-                'lang_type' => 'coptic',
-                'text' => $coText,
-                'speaker' => $speaker
-            ];
-        }
-    }
-
-    return $lines;
-}
-
-    /**
-     * Fallback section names in case title_ar is missing
-     */
-    private function getDefaultSectionName(string $key): string
+    private function buildLines(array $reading): array
     {
-        return [
-            'vespers_psalm' => 'مزمور عشية',
-            'vespers_gospel' => 'إنجيل عشية',
-            'matins_psalm' => 'مزمور باكر',
-            'matins_gospel' => 'إنجيل باكر',
-            'pauline' => 'البولس',
-            'catholic' => 'الكاثوليكون',
-            'praxis' => 'الإبركسيس',
-            'synaxarium' => 'السنكسار',
-            'liturgy_psalm' => 'مزمور القداس',
-            'liturgy_gospel' => 'إنجيل القداس',
-        ][$key] ?? $key;
+        $lines = [];
+        $lineOrder = 0;
+        // جلب القائل (الكاهن، الشعب، إلخ)
+        $speaker = $reading['speaker'] ?? null;
+
+        $textAr = $reading['text_ar'] ?? [];
+        $textCo = $reading['text_co'] ?? [];
+        $textArCo = $reading['text_ar_co'] ?? [];
+
+        $maxLines = max(count($textAr), count($textCo), count($textArCo));
+
+        for ($i = 0; $i < $maxLines; $i++) {
+            $arText = $textAr[$i] ?? '';
+            $coText = $textCo[$i] ?? '';
+            $arCoText = $textArCo[$i] ?? '';
+
+            // نرسل الـ speaker مع أول سطر فقط في المجموعة أو مع كل الأسطر حسب تفضيلك
+            // هنا سأرسله مع كل سطر ليتمكن الـ Frontend من معرفة صاحب النص
+
+            if (!empty($arText)) {
+                $lines[] = [
+                    'id' => $lineOrder++,
+                    'lang_type' => 'arabic',
+                    'text' => $arText,
+                    'speaker' => $speaker // إدراج القائل هنا
+                ];
+            }
+
+            if (!empty($arCoText)) {
+                $lines[] = [
+                    'id' => $lineOrder++,
+                    'lang_type' => 'coptic_arabized',
+                    'text' => $arCoText,
+                    'speaker' => $speaker
+                ];
+            }
+
+            if (!empty($coText)) {
+                $lines[] = [
+                    'id' => $lineOrder++,
+                    'lang_type' => 'coptic',
+                    'text' => $coText,
+                    'speaker' => $speaker
+                ];
+            }
+        }
+
+        return $lines;
     }
+
 
     /**
      * Extract season from Coptic date (you can enhance this)
