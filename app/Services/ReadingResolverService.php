@@ -142,17 +142,30 @@ class ReadingResolverService
     }
 
     /**
-     * يحسب عيد القيامة وفقاً للتقويم الغريغوري (الموحد العالمي).
-     * هذه الخوارزمية تضمن أن يكون العيد يوم 5 أبريل في عام 2026.
-     */
-    public function calculateEaster(int $year): Carbon
-    {
-        // PHP built-in function to calculate Gregorian Easter
-        $daysAfterMarch21 = easter_days($year);
+ * حساب عيد القيامة الغربي برمجياً بدون الاعتماد على إضافة Calendar
+ * هذه الخوارزمية تضمن أن يكون العيد يوم 5 أبريل في عام 2026.
+ */
+public function calculateEaster(int $year): Carbon
+{
+    // خوارزمية حساب عيد القيامة (Meeus/Jones/Butcher)
+    $a = $year % 19;
+    $b = (int)($year / 100);
+    $c = $year % 100;
+    $d = (int)($b / 4);
+    $e = $b % 4;
+    $f = (int)(($b + 8) / 25);
+    $g = (int)(($b - $f + 1) / 3);
+    $h = (19 * $a + $b - $d - $g + 15) % 30;
+    $i = (int)($c / 4);
+    $k = $c % 4;
+    $l = (32 + 2 * $e + 2 * $i - $h - $k) % 7;
+    $m = (int)(($a + 11 * $h + 22 * $l) / 451);
 
-        // Easter is calculated from March 21
-        return Carbon::createFromDate($year, 3, 21)->addDays($daysAfterMarch21);
-    }
+    $month = (int)(($h + $l - 7 * $m + 114) / 31);
+    $day = (($h + $l - 7 * $m + 114) % 31) + 1;
+
+    return Carbon::createFromDate($year, $month, $day);
+}
 
     public function determineSeason(Carbon $date, int $copticDay, int $copticMonth): string
     {

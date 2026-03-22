@@ -116,7 +116,7 @@ export function SplitViewReader({ lines, hasCoptic, className, justified = true 
                             </div>
                         )}
 
-                        <div className="flex flex-col md:flex-row gap-6 md:gap-10 items-start md:items-stretch">
+                        <div className="flex flex-col flex-row gap-6 md:gap-10 items-start md:items-stretch">
                             {/* العمود العربي */}
                             {showAr && ar && (
                                 <div className="flex-1 w-full">
@@ -139,7 +139,7 @@ export function SplitViewReader({ lines, hasCoptic, className, justified = true 
                                 <div className="flex-1 w-full">
                                     <p className={cn(
                                         "text-2xl md:text-4xl lg:text-5xl leading-[1.6] font-reading font-bold",
-                                        "!text-[#880808] dark:text-sky-400",
+                                        "!text-[#880808] dark:!text-sky-400",
                                         justified ? "text-justified" : "text-right"
                                     )} dir="rtl">
                                         {arcop.text}
