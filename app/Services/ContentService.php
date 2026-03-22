@@ -29,8 +29,13 @@ class ContentService
     /**
      * دالة دمج ملفات القداس بتنسيق مرقم
      */
-    public function getLiturgy(int $day , string $dayName ,string $season): ?array
+    public function getLiturgy($data): ?array
     {
+        $day = $data['dayKey'];
+        $dayName = $data['dayName'];
+        $season = $data['season'];
+
+
         $file = str_pad($day, 3, '0', STR_PAD_LEFT) . '.json';
         $FastingDays = ['الأربعاء', 'الجمعة'];
         $FastingSeasons = ['apostles_fast', 'nativity_fast', 'jonah_fast', 'great_lent'];
@@ -39,6 +44,7 @@ class ContentService
             "ellison_emas" =>'ellison emas',
             "our_father"=>'ابانا الذي في السموات',
             "aliloia_fay_be" =>'الليلويا فاي بي',
+            "oshit_alabaa" =>'اوشية الاباء',
         ];
 
 
@@ -55,6 +61,9 @@ class ContentService
             $fileConfigs["aliloia_fay_be"] = 'الليلويا إي إ';
         }
 
+        $variables = $data;
+        unset($variables['dayKey'], $variables['dayName'], $variables['season']);
+
         $combinedData = [];
         $counter = 1;
 
@@ -65,6 +74,10 @@ class ContentService
                 $fileContent = json_decode(file_get_contents($path), true);
 
                 if ($fileContent) {
+                    $processedContent = $this->replaceVariables(
+                        $fileContent['content'] ?? [],
+                        $variables
+                    );
                     // استخدام الـ code الموجود داخل ملف الـ json أو الـ configKey
                     $slug = $fileContent['code'] ?? $configKey;
                     $newKey = "{$counter}_{$slug}";
@@ -72,7 +85,7 @@ class ContentService
                     $combinedData[$newKey] = [
                         "title"   => $fileContent['title'] ?? '',
                         "style"   => $fileContent['style'] ?? 1,
-                        "content" => $fileContent['content'] ?? []
+                        "content" => $processedContent ?? []
                     ];
 
                     $counter++;
@@ -81,5 +94,24 @@ class ContentService
         }
 
         return !empty($combinedData) ? $combinedData : null;
+    }
+
+    private function replaceVariables($content, $variables)
+    {
+        if (is_array($content)) {
+            return array_map(function ($item) use ($variables) {
+                return $this->replaceVariables($item, $variables);
+            }, $content);
+        }
+
+        if (is_string($content)) {
+            foreach ($variables as $key => $value) {
+                if (is_scalar($value)) { // ✅ مهم
+                    $content = str_replace('$' . $key, $value, $content);
+                }
+            }
+        }
+
+        return $content;
     }
 }

@@ -20,7 +20,7 @@ class PresentationController extends Controller
         try {
             $dayData = $content->getLectionary($dayKey);
         } catch (\Exception $e) {
-            return redirect()->route('home');
+            //return redirect()->route('home');
         }
 
         if (!$dayData) {
@@ -115,12 +115,22 @@ class PresentationController extends Controller
     }
     public function liturgy(Request $request, ContentService $content)
     {
+
         $dayKey  = (int)$request->input('dayKey.dayKey');
         $dayName = $request->input('dayName.dayName');
         $season  = $request->input('season.season');
+        $data = [
+            "dayKey" => $dayKey ,
+            "dayName"=> $dayName,
+            "season" => $season,
+            "popename" => 'تواضروس الثاني',
+            "bishoprole" => 'مطران',
+            "bishopCoRole" => 'ابيسكوبوس',
+            "bishopname" => 'مينا'
+        ];
 
         try {
-            $Data = $content->getLiturgy($dayKey, $dayName, $season);
+            $Data = $content->getLiturgy($data);
         } catch (\Exception $e) {
             return redirect()->route('home');
         }

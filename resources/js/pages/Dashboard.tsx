@@ -32,6 +32,7 @@ type Props = {
         formatted: string;
     };
     gregorianDate: string;
+    gregorianDateISO: string;
     season: string;
     seasonLabel: string;
     dayKey: string;
@@ -70,6 +71,7 @@ const seasonStyles: Record<string, { icon: any; gradient: string; badge: string 
 export default function Dashboard({
     copticDate,
     gregorianDate,
+    gregorianDateISO,
     season,
     seasonLabel,
     dayKey,
@@ -81,7 +83,7 @@ export default function Dashboard({
     }, [season]);
 
     useEffect(() => {
-        setDateContext(dayKey, copticDate.formatted, seasonLabel, []);
+
     }, [dayKey, copticDate.formatted, seasonLabel, setDateContext]);
 
     return (
@@ -122,10 +124,13 @@ export default function Dashboard({
                             </div>
 
                             <div className="pt-2">
-                                <DateSelector currentDate={dayKey} onDateChange={(d) => {
-                                    localStorage.setItem('hos_selected_date', d);
-                                    router.visit(`/?day=${d}`);
-                                }} />
+                                <DateSelector
+                                    currentDate={gregorianDateISO}
+                                    onDateChange={(d) => {
+                                        localStorage.setItem('hos_selected_date', d);
+                                        router.visit(`/?day=${d}`);
+                                    }}
+                                />
                             </div>
                         </div>
 

@@ -35,7 +35,6 @@ class DashboardController extends Controller
             $targetDate->addDay();
         }
         $dayData = $this->resolver->resolveForDate($targetDate);
-        //dd($date->translatedFormat('l'));
         return Inertia::render('Dashboard', [
             'copticDate' => [
                 'day' => $dayData->copticDay,
@@ -44,6 +43,7 @@ class DashboardController extends Controller
                 'formatted' => $dayData->copticFormatted,
             ],
             'gregorianDate' => $date->translatedFormat('l j F Y'),
+            'gregorianDateISO' => $date->format('Y-m-d'),
             'dayName' => $date->translatedFormat('l'),
             'season' => $dayData->season,
             'seasonLabel' => $dayData->seasonLabel,
