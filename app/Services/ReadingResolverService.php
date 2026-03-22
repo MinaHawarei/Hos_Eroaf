@@ -147,24 +147,28 @@ class ReadingResolverService
  */
 public function calculateEaster(int $year): Carbon
 {
-    // خوارزمية حساب عيد القيامة (Meeus/Jones/Butcher)
+    // حساب عيد القيامة الأرثوذكسي (التقويم اليولياني)
     $a = $year % 19;
-    $b = (int)($year / 100);
-    $c = $year % 100;
-    $d = (int)($b / 4);
-    $e = $b % 4;
-    $f = (int)(($b + 8) / 25);
-    $g = (int)(($b - $f + 1) / 3);
-    $h = (19 * $a + $b - $d - $g + 15) % 30;
-    $i = (int)($c / 4);
-    $k = $c % 4;
-    $l = (32 + 2 * $e + 2 * $i - $h - $k) % 7;
-    $m = (int)(($a + 11 * $h + 22 * $l) / 451);
+    $b = $year % 4;
+    $c = $year % 7;
+    $ra = (19 * $a + 15) % 30;
+    $rb = (2 * $b + 4 * $c + 6 * $ra + 6) % 7;
 
-    $month = (int)(($h + $l - 7 * $m + 114) / 31);
-    $day = (($h + $l - 7 * $m + 114) % 31) + 1;
+    $days = $ra + $rb;
 
-    return Carbon::createFromDate($year, $month, $day);
+    // التاريخ بالتقويم اليولياني يكون إما في مارس أو أبريل
+    if ($days > 9) {
+        $month = 4;
+        $day = $days - 9;
+    } else {
+        $month = 3;
+        $day = $days + 22;
+    }
+
+
+    $easter = Carbon::createFromDate($year, $month, $day)->addDays(13);
+
+    return $easter;
 }
 
     public function determineSeason(Carbon $date, int $copticDay, int $copticMonth): string
