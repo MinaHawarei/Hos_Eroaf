@@ -119,14 +119,30 @@ class PresentationController extends Controller
         $dayKey  = (int)$request->input('dayKey.dayKey');
         $dayName = $request->input('dayName.dayName');
         $season  = $request->input('season.season');
+
+        $churchSettingsRaw = $request->cookie('church_settings');
+        $churchSettings = [];
+        if ($churchSettingsRaw) {
+            $churchSettings = json_decode($churchSettingsRaw, true) ?? [];
+        }
+
+        $popename = $churchSettings['popename'] ?? 'تواضروس الثاني';
+        $patron = $churchSettings['patron'] ?? 'العذراء مريم';
+        $diocesan_bishop = $churchSettings['diocesan_bishop'] ?? null;
+        $visiting_bishops = $churchSettings['visiting_bishops'] ?? [];
+
         $data = [
             "dayKey" => $dayKey ,
             "dayName"=> $dayName,
             "season" => $season,
-            "popename" => 'تواضروس الثاني',
-            "bishoprole" => 'مطران',
-            "bishopCoRole" => 'ابيسكوبوس',
-            "bishopname" => 'مينا'
+            "popename" => $popename,
+            "patron" => $patron,
+            "diocesan_bishop" => $diocesan_bishop,
+            "visiting_bishops" => $visiting_bishops,
+            // Fallbacks for compatibility if ContentService relies on old keys
+            "bishoprole" => $diocesan_bishop['role'] ?? 'أسقف',
+            "bishopCoRole" => $diocesan_bishop['coRole'] ?? 'أبيسكوبوس',
+            "bishopname" => $diocesan_bishop['name'] ?? ''
         ];
 
         try {

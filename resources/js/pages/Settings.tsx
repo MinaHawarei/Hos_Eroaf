@@ -17,11 +17,12 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { useForm } from '@inertiajs/react';
+import Cookies from 'js-cookie';
 
 type Bishop = {
     name: string;
     role: string; // مطران أو أسقف
-    coRole: string; // أبيسكوبوس أو غيرها
+    coRole: string; // أبيسكوبوس أو متروبوليتيس
 };
 
 type Props = {
@@ -29,6 +30,7 @@ type Props = {
     appVersion: string;
     currentReadingsVersion: string | null;
     initialChurchData?: any; // البيانات المخزنة مسبقاً من السيرفر
+    patronsList?: string[];
 };
 
 export default function Settings({
@@ -36,6 +38,7 @@ export default function Settings({
     appVersion,
     currentReadingsVersion,
     initialChurchData,
+    patronsList = [],
 }: Props) {
     const { appearance, updateAppearance } = useAppearance();
     const [checkingUpdates, setCheckingUpdates] = useState(false);
@@ -43,31 +46,68 @@ export default function Settings({
 
     // Inertia Form لبيانات الكنيسة والخدمة
     const { data, setData, post, processing, recentlySuccessful } = useForm({
+        patron: initialChurchData?.patron || 'العذراء مريم',
         popename: initialChurchData?.popename || 'تواضروس الثاني',
-        isBishopPresent: initialChurchData?.isBishopPresent || false,
-        bishops: initialChurchData?.bishops || [{ name: '', role: 'أسقف', coRole: 'أبيسكوبوس' }] as Bishop[]
+        diocesan_bishop: initialChurchData?.diocesan_bishop || {
+            name: '',
+            role: 'أسقف',
+            coRole: 'أبيسكوبوس',
+        },
+        hasVisitingBishops: initialChurchData?.visiting_bishops?.length > 0 || false,
+        visiting_bishops: initialChurchData?.visiting_bishops || ([] as Bishop[])
     });
+
+    const getCoRole = (role: string) => {
+        if (role === 'مطران') return 'متروبوليتيس';
+        if (role === 'أسقف') return 'أبيسكوبوس';
+        return 'أبيسكوبوس';
+    };
+
+    const handleDiocesanRoleChange = (role: string) => {
+        setData('diocesan_bishop', {
+            ...data.diocesan_bishop,
+            role,
+            coRole: getCoRole(role),
+        });
+    };
 
     const handleSaveChurchData = (e: React.FormEvent) => {
         e.preventDefault();
+        
+        // Save to js-cookie for immediate UI availability
+        const dataToSave = {
+            patron: data.patron,
+            popename: data.popename,
+            diocesan_bishop: data.diocesan_bishop,
+            visiting_bishops: data.hasVisitingBishops ? data.visiting_bishops : [],
+        };
+        
+        Cookies.set('church_settings', JSON.stringify(dataToSave), { expires: 365, path: '/' });
+
+        // Update the useForm data in case we toggled off visiting bishops so it sends an empty array
+        setData('visiting_bishops', dataToSave.visiting_bishops);
+
         post(route('settings.update-church'), {
             preserveScroll: true,
         });
     };
 
-    const addBishop = () => {
-        setData('bishops', [...data.bishops, { name: '', role: 'أسقف', coRole: 'أبيسكوبوس' }]);
+    const addVisitingBishop = () => {
+        setData('visiting_bishops', [...data.visiting_bishops, { name: '', role: 'أسقف', coRole: 'أبيسكوبوس' }]);
     };
 
-    const removeBishop = (index: number) => {
-        const newBishops = data.bishops.filter((_, i) => i !== index);
-        setData('bishops', newBishops);
+    const removeVisitingBishop = (index: number) => {
+        const newBishops = data.visiting_bishops.filter((_: any, i: number) => i !== index);
+        setData('visiting_bishops', newBishops);
     };
 
-    const updateBishop = (index: number, field: keyof Bishop, value: string) => {
-        const newBishops = [...data.bishops];
+    const updateVisitingBishop = (index: number, field: keyof Bishop, value: string) => {
+        const newBishops = [...data.visiting_bishops];
         newBishops[index] = { ...newBishops[index], [field]: value };
-        setData('bishops', newBishops);
+        if (field === 'role') {
+            newBishops[index].coRole = getCoRole(value);
+        }
+        setData('visiting_bishops', newBishops);
     };
 
     const checkForUpdates = async () => {
@@ -107,10 +147,27 @@ export default function Settings({
                 <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
                     <h2 className="mb-4 flex items-center gap-2 text-base font-semibold text-foreground">
                         <User className="h-4.5 w-4.5 text-primary" />
-                        بيانات الآباء والخدمة
+                        بيانات الكنيسة والآباء
                     </h2>
 
                     <form onSubmit={handleSaveChurchData} className="space-y-4">
+                        {/* Church Patron */}
+                        <div className="space-y-1.5">
+                            <label className="text-sm font-medium text-muted-foreground">شفيع الكنيسة</label>
+                            <div className="relative">
+                                <select
+                                    value={data.patron}
+                                    onChange={e => setData('patron', e.target.value)}
+                                    className="w-full appearance-none rounded-xl border border-border bg-muted/30 px-4 py-2.5 text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
+                                >
+                                    {patronsList.map(patron => (
+                                        <option key={patron} value={patron}>{patron}</option>
+                                    ))}
+                                </select>
+                                <ChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                            </div>
+                        </div>
+
                         {/* Pope Name */}
                         <div className="space-y-1.5">
                             <label className="text-sm font-medium text-muted-foreground">اسم البطريرك</label>
@@ -123,81 +180,115 @@ export default function Settings({
                             />
                         </div>
 
-                        {/* Bishop Presence Toggle */}
+                        {/* Diocesan Bishop */}
+                        <div className="rounded-xl border border-border/60 bg-muted/10 p-4 space-y-4">
+                            <h3 className="text-sm font-bold text-foreground">أسقف الإيبارشية / رئيس الدير</h3>
+                            
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-1.5">
+                                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">الرتبة</label>
+                                    <select
+                                        value={data.diocesan_bishop.role}
+                                        onChange={e => handleDiocesanRoleChange(e.target.value)}
+                                        className="w-full rounded-lg bg-background p-2 text-sm border border-border outline-none focus:ring-1 focus:ring-primary"
+                                    >
+                                        <option value="أسقف">أسقف</option>
+                                        <option value="مطران">مطران</option>
+                                    </select>
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">اللقب الكنسي</label>
+                                    <input
+                                        type="text"
+                                        disabled
+                                        value={data.diocesan_bishop.coRole}
+                                        className="w-full rounded-lg bg-muted/50 p-2 text-sm border border-border outline-none opacity-80 cursor-not-allowed"
+                                    />
+                                </div>
+                            </div>
+                            
+                            <div className="space-y-1.5">
+                                <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">اسم الأب</label>
+                                <input
+                                    type="text"
+                                    value={data.diocesan_bishop.name}
+                                    onChange={e => setData('diocesan_bishop', { ...data.diocesan_bishop, name: e.target.value })}
+                                    className="w-full rounded-lg bg-background p-2.5 text-sm border border-border outline-none focus:ring-1 focus:ring-primary"
+                                    placeholder="مثال: مينا"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Visiting Bishops Toggle */}
                         <div className="flex items-center justify-between rounded-xl bg-muted/20 p-3 border border-border/50">
                             <div className="flex flex-col">
-                                <span className="text-sm font-medium text-foreground">حضور أسقف أو مطران</span>
-                                <span className="text-xs text-muted-foreground">تفعيل هذا الخيار سيضيف أسماءهم للصلوات</span>
+                                <span className="text-sm font-medium text-foreground">الأساقفة الحاضرون (ضيوف)</span>
+                                <span className="text-xs text-muted-foreground">تفعيل لإضافة آباء آخرين حاضرين</span>
                             </div>
                             <button
                                 type="button"
-                                onClick={() => setData('isBishopPresent', !data.isBishopPresent)}
-                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${data.isBishopPresent ? 'bg-primary' : 'bg-muted-foreground/30'}`}
+                                onClick={() => setData('hasVisitingBishops', !data.hasVisitingBishops)}
+                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${data.hasVisitingBishops ? 'bg-primary' : 'bg-muted-foreground/30'}`}
                             >
-                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${data.isBishopPresent ? 'translate-x-6' : 'translate-x-1'}`} />
+                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${data.hasVisitingBishops ? 'translate-x-6' : 'translate-x-1'}`} />
                             </button>
                         </div>
 
-                        {/* Bishop List */}
-                        {data.isBishopPresent && (
+                        {/* Visiting Bishops List */}
+                        {data.hasVisitingBishops && (
                             <div className="space-y-4 pt-2">
-                                {data.bishops.map((bishop, index) => (
+                                {data.visiting_bishops.map((bishop: Bishop, index: number) => (
                                     <div key={index} className="relative space-y-3 rounded-xl border border-dashed border-border p-4 animate-in fade-in zoom-in-95 duration-200">
                                         <div className="grid grid-cols-2 gap-3">
                                             <div className="space-y-1">
                                                 <label className="text-[10px] uppercase tracking-wider text-muted-foreground">الرتبة</label>
                                                 <select
                                                     value={bishop.role}
-                                                    onChange={e => updateBishop(index, 'role', e.target.value)}
-                                                    className="w-full rounded-lg bg-muted/50 p-2 text-sm border-none outline-none ring-1 ring-border"
+                                                    onChange={e => updateVisitingBishop(index, 'role', e.target.value)}
+                                                    className="w-full rounded-lg bg-background p-2 text-sm border border-border outline-none focus:ring-1 focus:ring-primary"
                                                 >
                                                     <option value="أسقف">أسقف</option>
                                                     <option value="مطران">مطران</option>
-                                                    <option value="رئيس دير">رئيس دير</option>
                                                 </select>
                                             </div>
                                             <div className="space-y-1">
                                                 <label className="text-[10px] uppercase tracking-wider text-muted-foreground">اللقب الكنسي</label>
-                                                <select
+                                                <input
+                                                    type="text"
+                                                    disabled
                                                     value={bishop.coRole}
-                                                    onChange={e => updateBishop(index, 'coRole', e.target.value)}
-                                                    className="w-full rounded-lg bg-muted/50 p-2 text-sm border-none outline-none ring-1 ring-border"
-                                                >
-                                                    <option value="أبيسكوبوس">أبيسكوبوس</option>
-                                                    <option value="متروبوليتيس">متروبوليتيس</option>
-                                                </select>
+                                                    className="w-full rounded-lg bg-muted/50 p-2 text-sm border border-border outline-none opacity-80 cursor-not-allowed"
+                                                />
                                             </div>
                                         </div>
                                         <div className="space-y-1">
-                                            <label className="text-[10px] uppercase tracking-wider text-muted-foreground">اسم الأب</label>
+                                            <label className="text-[10px] uppercase tracking-wider text-muted-foreground">اسم الأب الضيف</label>
                                             <div className="flex gap-2">
                                                 <input
                                                     type="text"
                                                     value={bishop.name}
-                                                    onChange={e => updateBishop(index, 'name', e.target.value)}
-                                                    className="flex-1 rounded-lg bg-muted/50 p-2 text-sm border-none outline-none ring-1 ring-border focus:ring-primary"
-                                                    placeholder="مثال: مينا"
+                                                    onChange={e => updateVisitingBishop(index, 'name', e.target.value)}
+                                                    className="flex-1 rounded-lg bg-background p-2 text-sm border border-border outline-none focus:ring-1 focus:ring-primary"
+                                                    placeholder="الاسم"
                                                 />
-                                                {data.bishops.length > 1 && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => removeBishop(index)}
-                                                        className="flex items-center justify-center rounded-lg bg-red-50 p-2 text-red-500 hover:bg-red-100 dark:bg-red-950/30"
-                                                    >
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </button>
-                                                )}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeVisitingBishop(index)}
+                                                    className="flex items-center justify-center rounded-lg bg-red-50 p-2 text-red-500 hover:bg-red-100 dark:bg-red-950/30"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </button>
                                             </div>
                                         </div>
                                     </div>
                                 ))}
                                 <button
                                     type="button"
-                                    onClick={addBishop}
-                                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-primary/40 py-2 text-sm text-primary hover:bg-primary/5 transition-colors"
+                                    onClick={addVisitingBishop}
+                                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-primary/40 py-2.5 text-sm text-primary hover:bg-primary/5 transition-colors"
                                 >
                                     <Plus className="h-4 w-4" />
-                                    إضافة أب آخر
+                                    إضافة أب ضيف
                                 </button>
                             </div>
                         )}
@@ -207,7 +298,7 @@ export default function Settings({
                             disabled={processing}
                             className={`w-full rounded-xl py-3 text-sm font-bold text-primary-foreground shadow-md transition-all ${recentlySuccessful ? 'bg-emerald-600' : 'bg-primary hover:opacity-90 active:scale-[0.98]'}`}
                         >
-                            {processing ? 'جاري الحفظ...' : recentlySuccessful ? 'تم الحفظ بنجاح ✓' : 'حفظ إعدادات الخدمة'}
+                            {processing ? 'جاري الحفظ...' : recentlySuccessful ? 'تم الحفظ بنجاح ✓' : 'حفظ إعدادات الكنيسة'}
                         </button>
                     </form>
                 </section>

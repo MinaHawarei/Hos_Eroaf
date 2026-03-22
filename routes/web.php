@@ -21,3 +21,4 @@ Route::get('/presentation/{dayKey}', [PresentationController::class, 'lectionary
 
 // Settings
 Route::get('/settings', [SettingsController::class, 'index'])->name('settings');
+Route::post('/settings/church', [SettingsController::class, 'update'])->name('settings.update-church');
