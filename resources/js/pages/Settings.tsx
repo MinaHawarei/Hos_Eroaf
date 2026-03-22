@@ -14,6 +14,8 @@ import {
     Plus,
     Trash2,
     ChevronDown,
+    Monitor,
+    Type,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useForm } from '@inertiajs/react';
@@ -64,7 +66,8 @@ export default function Settings({
             coRole: 'أبيسكوبوس',
         },
         hasVisitingBishops: initialChurchData?.visiting_bishops?.length > 0 || false,
-        visiting_bishops: initialChurchData?.visiting_bishops || ([] as Bishop[])
+        visiting_bishops: initialChurchData?.visiting_bishops || ([] as Bishop[]),
+        baseFontSize: Number(Cookies.get('baseFontSize')) || 28
     });
 
     const getCoRole = (role: string) => {
@@ -93,6 +96,7 @@ export default function Settings({
         };
         
         Cookies.set('church_settings', JSON.stringify(dataToSave), { expires: 365, path: '/' });
+        Cookies.set('baseFontSize', data.baseFontSize.toString(), { expires: 365, path: '/' });
 
         // Update the useForm data in case we toggled off visiting bishops so it sends an empty array
         setData('visiting_bishops', dataToSave.visiting_bishops);
@@ -333,6 +337,51 @@ export default function Settings({
                             {processing ? 'جاري الحفظ...' : recentlySuccessful ? 'تم الحفظ بنجاح ✓' : 'حفظ إعدادات الكنيسة'}
                         </button>
                     </form>
+                </section>
+
+                {/* Display & Presentation Settings Section */}
+                <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+                    <h2 className="mb-4 flex items-center gap-2 text-base font-semibold text-foreground">
+                        <Monitor className="h-4.5 w-4.5 text-primary" />
+                        إعدادات العرض
+                    </h2>
+                    
+                    <div className="space-y-4">
+                        <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                                <label className="text-sm font-medium text-foreground flex items-center gap-2">
+                                    <Type className="h-4 w-4 text-muted-foreground" />
+                                    حجم الخط الأساسي للعرض
+                                </label>
+                                <span className="text-sm font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-lg">
+                                    {data.baseFontSize}px
+                                </span>
+                            </div>
+                            
+                            <input
+                                type="range"
+                                min="20"
+                                max="80"
+                                step="2"
+                                value={data.baseFontSize}
+                                onChange={(e) => {
+                                    const val = Number(e.target.value);
+                                    setData('baseFontSize', val);
+                                    Cookies.set('baseFontSize', val.toString(), { expires: 365, path: '/' });
+                                }}
+                                className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
+                            />
+                            
+                            <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                                <span>صغير (20)</span>
+                                <span>كبير (80)</span>
+                            </div>
+
+                            <div className="mt-4 p-4 rounded-xl border border-border bg-muted/30 text-center" style={{ fontSize: `${data.baseFontSize}px` }}>
+                                تجربة حجم النص الأساسي
+                            </div>
+                        </div>
+                    </div>
                 </section>
 
                 {/* Content Updates Section */}

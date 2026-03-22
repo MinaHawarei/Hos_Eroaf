@@ -1,27 +1,55 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import { Search, X, Loader2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { SearchService } from '@/services/SearchService';
 
-export function SearchOverlay({ open, onOpenChange, onResultClick }: { open: boolean, onOpenChange: (open: boolean) => void, onResultClick: (result: any) => void }) {
+export function SearchOverlay({ open, onOpenChange, onResultClick, slides = [] }: { open: boolean, onOpenChange: (open: boolean) => void, onResultClick: (result: any) => void, slides?: any[] }) {
     const [query, setQuery] = useState('');
     const [results, setResults] = useState<Record<string, any[]>>({});
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        if (!query || query.length < 3) {
+        if (!query || query.length < 2) {
             setResults({});
             return;
         }
 
-        const timeoutId = setTimeout(async () => {
+        const timeoutId = setTimeout(() => {
             setLoading(true);
+            
             try {
-                const res = await axios.get(`/api/search?q=${encodeURIComponent(query)}`);
-                setResults(res.data.results);
+                // Perform client-side search inside the active JSON category using SearchService
+                const grouped: Record<string, any[]> = {};
+                
+                slides.forEach(slide => {
+                    if (!slide.lines || !Array.isArray(slide.lines)) return;
+                    
+                    // Filter lines for those containing the match
+                    const matchingLines = slide.lines.filter((line: any) => {
+                        return line && line.text && SearchService.isMatch(query, line.text);
+                    });
+                    
+                    if (matchingLines.length > 0) {
+                        const sCode = slide.section_code || 'other';
+                        if (!grouped[sCode]) {
+                            grouped[sCode] = [];
+                        }
+                        
+                        // Add the first matching line text as excerpt
+                        grouped[sCode].push({
+                            ...slide,
+                            reading_title: slide.title || slide.section_name || 'قراءة بدون عنوان',
+                            matched_text: matchingLines[0].text
+                        });
+                    }
+                });
+
+                setResults(grouped);
             } catch (err) {
-                console.error(err);
+                console.error("Search error:", err);
+                setResults({});
             } finally {
                 setLoading(false);
             }
@@ -68,9 +96,9 @@ export function SearchOverlay({ open, onOpenChange, onResultClick }: { open: boo
                                     className="w-full text-right px-4 py-3 rounded-lg hover:bg-muted transition-colors flex flex-col gap-1"
                                 >
                                     <span className="font-medium text-sm text-foreground">{item.reading_title}</span>
-                                    <span className="text-muted-foreground text-sm opacity-90 truncate w-full"
+                                    <span className="text-muted-foreground text-sm opacity-90 truncate w-full" style={{ fontFamily: 'var(--pres-font)' }}
                                         dangerouslySetInnerHTML={{
-                                            __html: item.text.replace(new RegExp(query, 'gi'), (match: string) => `<mark class="bg-primary/20 text-primary rounded px-1 font-bold">${match}</mark>`)
+                                            __html: SearchService.highlightMatch(query, item.matched_text || item.text || '')
                                         }}
                                     />
                                 </button>

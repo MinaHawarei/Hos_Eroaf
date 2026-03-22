@@ -1,21 +1,153 @@
-import React from 'react';
+import React, { useState, useEffect, useImperativeHandle, forwardRef } from 'react';
 import { cn } from '@/lib/utils';
+import { TextPaginator } from '@/utils/TextPaginator';
 
-interface Line {
+export interface Line {
     id: number;
     lang_type: 'arabic' | 'coptic_arabized' | 'coptic';
     text: string;
     speaker?: string;
 }
 
-interface SplitViewReaderProps {
+export interface SplitViewReaderProps {
     lines: Line[];
     hasCoptic: boolean;
     className?: string;
     justified?: boolean;
 }
 
-export function SplitViewReader({ lines, hasCoptic, className, justified = true }: SplitViewReaderProps) {
+export interface SplitViewReaderRef {
+    nextPage: () => boolean;
+    prevPage: () => boolean;
+    isFirstPage: boolean;
+    isLastPage: boolean;
+}
+
+export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderProps>(({ lines, hasCoptic, className, justified = true }, ref) => {
+    const [currentPage, setCurrentPage] = useState(0);
+    const [pages, setPages] = useState<Line[][]>([lines]); // Default to all lines as 1 page initially
+
+    // Initialize Pagination
+    useEffect(() => {
+        setCurrentPage(0);
+        
+        if (!lines || lines.length === 0) {
+            setPages([]);
+            return;
+        }
+
+        const maxContentHeight = typeof window !== 'undefined' ? window.innerHeight * 0.70 : 600;
+        const paginator = new TextPaginator('slide-content-enter');
+        const computedPages: Line[][] = [];
+
+        if (hasCoptic) {
+            // Group Coptic pairs safely
+            const arabicLines = lines.filter((l) => l.lang_type === 'arabic');
+            const arcopticLines = lines.filter((l) => l.lang_type === 'coptic_arabized');
+            const copticLines = lines.filter((l) => l.lang_type === 'coptic');
+            
+            const maxLen = Math.max(arabicLines.length, copticLines.length, arcopticLines.length);
+            let currentHeight = 0;
+            let currentChunk: Line[] = [];
+
+            for (let i = 0; i < maxLen; i++) {
+                const ar = arabicLines[i];
+                const copAr = arcopticLines[i];
+                const cop = copticLines[i];
+
+                const simulatedHtml = `
+                    <div class="flex gap-10">
+                        <p class="flex-1">${ar?.text || ''}</p>
+                        <p class="flex-1">${copAr?.text || ''}</p>
+                        <p class="flex-1">${cop?.text || ''}</p>
+                    </div>
+                `;
+
+                // @ts-ignore
+                const h = paginator.measureHeight(simulatedHtml);
+
+                // If adding this block exceeds height, wrap to new page
+                if (currentHeight + h > maxContentHeight && currentChunk.length > 0) {
+                    computedPages.push(currentChunk);
+                    currentChunk = [];
+                    currentHeight = 0;
+                }
+
+                if (ar) currentChunk.push(ar);
+                if (copAr) currentChunk.push(copAr);
+                if (cop) currentChunk.push(cop);
+
+                currentHeight += h;
+            }
+
+            if (currentChunk.length > 0) {
+                computedPages.push(currentChunk);
+            }
+        } else {
+            // Arabic only: Split long text blocks if necessary
+            let currentHeight = 0;
+            let currentChunk: Line[] = [];
+
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                // @ts-ignore
+                const h = paginator.measureHeight(line.text);
+
+                // If a SINGLE line is enormous, split its text into smaller blocks
+                if (h > maxContentHeight) {
+                    if (currentChunk.length > 0) {
+                        computedPages.push(currentChunk);
+                        currentChunk = [];
+                        currentHeight = 0;
+                    }
+                    
+                    const chunks = paginator.paginate(line.text, maxContentHeight);
+                    chunks.forEach(chunk => {
+                        computedPages.push([{ ...line, text: chunk }]);
+                    });
+                    continue;
+                }
+
+                if (currentHeight + h > maxContentHeight && currentChunk.length > 0) {
+                    computedPages.push(currentChunk);
+                    currentChunk = [];
+                    currentHeight = 0;
+                }
+
+                currentChunk.push(line);
+                currentHeight += h;
+            }
+
+            if (currentChunk.length > 0) {
+                computedPages.push(currentChunk);
+            }
+        }
+
+        paginator.cleanup();
+        setPages(computedPages.length > 0 ? computedPages : [lines]);
+    }, [lines, hasCoptic]);
+
+    // Expose pagination controls to Parent (PresentationPage)
+    useImperativeHandle(ref, () => ({
+        nextPage: () => {
+            if (currentPage < pages.length - 1) {
+                setCurrentPage(prev => prev + 1);
+                return true;
+            }
+            return false;
+        },
+        prevPage: () => {
+            if (currentPage > 0) {
+                setCurrentPage(prev => prev - 1);
+                return true;
+            }
+            return false;
+        },
+        isFirstPage: currentPage === 0,
+        isLastPage: currentPage === pages.length - 1
+    }));
+
+    const currentLines = pages[currentPage] || [];
 
     // 1. المساعدة لتحديد استايل المتحدث
     const getSpeakerStyles = (speaker?: string) => {
@@ -36,12 +168,12 @@ export function SplitViewReader({ lines, hasCoptic, className, justified = true 
     if (!hasCoptic) {
         return (
             <div className={cn("flex flex-col gap-6 max-w-5xl mx-auto w-full px-4", className)}>
-                {lines.map((line, index) => {
-                    const prevSpeaker = index > 0 ? lines[index - 1].speaker : null;
+                {currentLines.map((line, index) => {
+                    const prevSpeaker = index > 0 ? currentLines[index - 1].speaker : null;
                     const shouldShowSpeaker = line.speaker && line.speaker !== prevSpeaker;
 
                     return (
-                        <div key={line.id || index} className="flex flex-col gap-4">
+                        <div key={`${currentPage}-${line.id || index}`} className="flex flex-col gap-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
                             {shouldShowSpeaker && (
                                 <div className="flex items-center gap-4 my-4">
                                     <div className="h-[1px] flex-1 bg-gradient-to-l from-transparent to-border" />
@@ -65,9 +197,9 @@ export function SplitViewReader({ lines, hasCoptic, className, justified = true 
     }
 
     // --- حالة العرض الثلاثي (عربي - معرب - قبطي) ---
-    const arabicLines = lines.filter((l) => l.lang_type === 'arabic');
-    const arcopticLines = lines.filter((l) => l.lang_type === 'coptic_arabized');
-    const copticLines = lines.filter((l) => l.lang_type === 'coptic');
+    const arabicLines = currentLines.filter((l) => l.lang_type === 'arabic');
+    const arcopticLines = currentLines.filter((l) => l.lang_type === 'coptic_arabized');
+    const copticLines = currentLines.filter((l) => l.lang_type === 'coptic');
 
     const pairedLines: (Line | null)[][] = [];
     const maxLen = Math.max(arabicLines.length, copticLines.length, arcopticLines.length);
@@ -166,4 +298,4 @@ export function SplitViewReader({ lines, hasCoptic, className, justified = true 
             })}
         </div>
     );
-}
+});

@@ -1,4 +1,5 @@
-import { useMemo } from 'react';
+import { useState, useEffect } from 'react';
+import { TextPaginator } from '@/utils/TextPaginator';
 
 interface OriginalSlide {
     id: string;
@@ -11,42 +12,29 @@ interface OriginalSlide {
 }
 
 interface SplitSlide extends OriginalSlide {
-    /** Index of this page within the original slide (0-based) */
     pageIndex: number;
-    /** Total pages the original slide was split into */
     totalPages: number;
-    /** The original slide index before splitting */
     originalIndex: number;
 }
 
-/**
- * Maximum number of "line-units" per slide.
- *
- * For slides WITH Coptic:  each paired row (Arabic + Coptic) = 1 unit.
- * For slides WITHOUT Coptic: each line = 1 unit.
- *
- * We estimate conservatively based on typical viewport height:
- *   - Header area ≈ 200px (section title + intonation + ornament)
- *   - Bottom controls ≈ 100px
- *   - Available ≈ viewport - 300px
- *   - Each text line ≈ 100–120px at presentation sizes
- *
- * `maxLinesPerSlide` can be tuned per display, but 4 is a safe
- * default for projectors / laptops at large font sizes.
- */
-const MAX_LINES_PER_SLIDE = 4;
-
-/**
- * Takes the raw slides from the backend and splits any slide
- * whose content exceeds the viewport into multiple sub-slides,
- * each keeping the same section_name / intonation header.
- */
 export function useSlideSplitter(
     slides: OriginalSlide[],
-    maxLines: number = MAX_LINES_PER_SLIDE
+    baseFontSize: number = 28
 ): SplitSlide[] {
-    return useMemo(() => {
-        if (!slides || slides.length === 0) return [];
+    const [splitSlides, setSplitSlides] = useState<SplitSlide[]>([]);
+
+    useEffect(() => {
+        if (!slides || slides.length === 0 || typeof window === 'undefined') {
+            setSplitSlides([]);
+            return;
+        }
+
+        // We use an 85vh limit for content
+        const maxHeight = window.innerHeight * 0.85;
+        const paginator = new TextPaginator('slide-content-enter');
+        
+        // Apply current font size to sandbox so measurements are accurate
+        document.documentElement.style.setProperty('--pres-font-size', `${baseFontSize}px`);
 
         const result: SplitSlide[] = [];
 
@@ -54,69 +42,120 @@ export function useSlideSplitter(
             const { lines, has_coptic } = slide;
 
             if (has_coptic) {
-                // Split by paired lines
+                // For Coptic slides, we still rely primarily on pairs, but we could measure them.
+                // To keep it safe, we'll group pairs that fit within the height.
                 const arabicLines = lines.filter(l => l.lang_type === 'arabic');
                 const copticLines = lines.filter(l => l.lang_type === 'coptic_arabized');
-                const pairCount = Math.max(arabicLines.length, copticLines.length);
+                const pureCopticLines = lines.filter(l => l.lang_type === 'coptic');
+                
+                const pairCount = Math.max(arabicLines.length, copticLines.length, pureCopticLines.length);
 
-                if (pairCount <= maxLines) {
-                    // Fits in one slide
+                let currentPagePairs: any[] = [];
+                let currentHeight = 0;
+                let pageIndex = 0;
+                let pages: any[][] = [];
+
+                for (let i = 0; i < pairCount; i++) {
+                    const ar = arabicLines[i]?.text || '';
+                    const copAr = copticLines[i]?.text || '';
+                    const cop = pureCopticLines[i]?.text || '';
+
+                    const simulatedHtml = `
+                        <div class="flex gap-10">
+                            <p class="flex-1">${ar}</p>
+                            <p class="flex-1">${copAr}</p>
+                            <p class="flex-1">${cop}</p>
+                        </div>
+                    `;
+
+                    // @ts-ignore
+                    const h = paginator.measureHeight(simulatedHtml);
+                    
+                    if (currentHeight + h > maxHeight && currentPagePairs.length > 0) {
+                        pages.push(currentPagePairs);
+                        currentPagePairs = [];
+                        currentHeight = 0;
+                    }
+                    
+                    currentPagePairs.push({ ar: arabicLines[i], copAr: copticLines[i], cop: pureCopticLines[i] });
+                    currentHeight += h;
+                }
+
+                if (currentPagePairs.length > 0) {
+                    pages.push(currentPagePairs);
+                }
+
+                pages.forEach((pagePairs, pIdx) => {
+                    const pageLines = pagePairs.flatMap((p: any) => [p.ar, p.copAr, p.cop].filter(Boolean));
                     result.push({
                         ...slide,
-                        pageIndex: 0,
-                        totalPages: 1,
+                        id: `${slide.id}-p${pIdx}`,
+                        lines: pageLines,
+                        pageIndex: pIdx,
+                        totalPages: pages.length,
                         originalIndex,
                     });
-                } else {
-                    // Split into chunks
-                    const totalPages = Math.ceil(pairCount / maxLines);
-                    for (let page = 0; page < totalPages; page++) {
-                        const startPair = page * maxLines;
-                        const endPair = Math.min(startPair + maxLines, pairCount);
+                });
 
-                        // Collect the lines for this page
-                        const pageArabic = arabicLines.slice(startPair, endPair);
-                        const pageCoptic = copticLines.slice(startPair, endPair);
-                        const pageLines = [...pageArabic, ...pageCoptic];
-
-                        result.push({
-                            ...slide,
-                            id: `${slide.id}-p${page}`,
-                            lines: pageLines,
-                            pageIndex: page,
-                            totalPages,
-                            originalIndex,
-                        });
-                    }
-                }
             } else {
-                // Arabic-only: split by line count
-                if (lines.length <= maxLines) {
+                // Arabic-only slides: Check if lines have huge text block (e.g. readings)
+                let pages: any[][] = [];
+                let currentPageLines: any[] = [];
+                let currentHeight = 0;
+
+                for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i];
+                    // @ts-ignore
+                    const h = paginator.measureHeight(line.text);
+
+                    // If a SINGLE line is taller than the max height, we MUST split its string!
+                    if (h > maxHeight) {
+                        // Push whatever we had
+                        if (currentPageLines.length > 0) {
+                            pages.push(currentPageLines);
+                            currentPageLines = [];
+                            currentHeight = 0;
+                        }
+
+                        // Use our string paginator logic
+                        const textChunks = paginator.paginate(line.text, maxHeight);
+                        textChunks.forEach((chunk) => {
+                            pages.push([{ ...line, text: chunk }]);
+                        });
+                        continue;
+                    }
+
+                    if (currentHeight + h > maxHeight && currentPageLines.length > 0) {
+                        pages.push(currentPageLines);
+                        currentPageLines = [];
+                        currentHeight = 0;
+                    }
+                    
+                    currentPageLines.push(line);
+                    currentHeight += h;
+                }
+
+                if (currentPageLines.length > 0) {
+                    pages.push(currentPageLines);
+                }
+
+                pages.forEach((pageLines, pIdx) => {
                     result.push({
                         ...slide,
-                        pageIndex: 0,
-                        totalPages: 1,
+                        id: `${slide.id}-p${pIdx}`,
+                        lines: pageLines,
+                        pageIndex: pIdx,
+                        totalPages: pages.length,
                         originalIndex,
                     });
-                } else {
-                    const totalPages = Math.ceil(lines.length / maxLines);
-                    for (let page = 0; page < totalPages; page++) {
-                        const start = page * maxLines;
-                        const end = Math.min(start + maxLines, lines.length);
-
-                        result.push({
-                            ...slide,
-                            id: `${slide.id}-p${page}`,
-                            lines: lines.slice(start, end),
-                            pageIndex: page,
-                            totalPages,
-                            originalIndex,
-                        });
-                    }
-                }
+                });
             }
         });
 
-        return result;
-    }, [slides, maxLines]);
+        paginator.cleanup();
+        setSplitSlides(result);
+
+    }, [slides, baseFontSize]);
+
+    return splitSlides;
 }

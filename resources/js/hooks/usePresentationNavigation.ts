@@ -4,7 +4,9 @@ import { router } from '@inertiajs/react';
 export function usePresentationNavigation(
     slides: any[],
     currentSlideIndex: number,
-    setCurrentSlideIndex: (index: number) => void
+    setCurrentSlideIndex: (index: number) => void,
+    onNext?: () => void,
+    onPrev?: () => void
 ) {
     const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -12,12 +14,14 @@ export function usePresentationNavigation(
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.key === 'ArrowRight' || e.key === ' ') {
                 e.preventDefault();
-                if (currentSlideIndex < slides.length - 1) {
+                if (onNext) onNext();
+                else if (currentSlideIndex < slides.length - 1) {
                     setCurrentSlideIndex(currentSlideIndex + 1);
                 }
             } else if (e.key === 'ArrowLeft') {
                 e.preventDefault();
-                if (currentSlideIndex > 0) {
+                if (onPrev) onPrev();
+                else if (currentSlideIndex > 0) {
                     setCurrentSlideIndex(currentSlideIndex - 1);
                 }
             } else if (e.key === 'Escape') {
@@ -31,7 +35,7 @@ export function usePresentationNavigation(
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [currentSlideIndex, slides.length, setCurrentSlideIndex]);
+    }, [currentSlideIndex, slides.length, setCurrentSlideIndex, onNext, onPrev]);
 
     const toggleFullscreen = async () => {
         if (!document.fullscreenElement) {

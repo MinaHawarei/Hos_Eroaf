@@ -2,8 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Head, router } from '@inertiajs/react';
 import { usePresentationNavigation } from '@/hooks/usePresentationNavigation';
 import { useExternalPresentation } from '@/hooks/useExternalPresentation';
-import { useSlideSplitter } from '@/hooks/useSlideSplitter';
-import { SplitViewReader } from '@/components/SplitViewReader';
+import { SplitViewReader, SplitViewReaderRef } from '@/components/SplitViewReader';
 import { PresentationSidebar } from '@/components/PresentationSidebar';
 import { SearchOverlay } from '@/components/SearchOverlay';
 import { Button } from '@/components/ui/button';
@@ -17,7 +16,10 @@ import {
     MonitorX,
     LogOut,
     BookOpen,
+    Plus,
+    Minus,
 } from 'lucide-react';
+import Cookies from 'js-cookie';
 
 interface Slide {
     id: string;
@@ -42,11 +44,30 @@ export default function PresentationPage({ copticDate, seasonLabel, sections, sl
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [searchOpen, setSearchOpen] = useState(false);
     const [slideKey, setSlideKey] = useState(0);
+    const [zoomLevel, setZoomLevel] = useState<number>(Number(Cookies.get('baseFontSize')) || 28);
 
-    const { isFullscreen, toggleFullscreen, nextSlide, prevSlide } = usePresentationNavigation(
+    const readerRef = React.useRef<SplitViewReaderRef>(null);
+
+    const handleNextSlide = useCallback(() => {
+        if (readerRef.current?.nextPage()) return;
+        if (currentSlideIndex < slides.length - 1) {
+            setCurrentSlideIndex(prev => prev + 1);
+        }
+    }, [currentSlideIndex, slides.length]);
+
+    const handlePrevSlide = useCallback(() => {
+        if (readerRef.current?.prevPage()) return;
+        if (currentSlideIndex > 0) {
+            setCurrentSlideIndex(prev => prev - 1);
+        }
+    }, [currentSlideIndex]);
+
+    const { isFullscreen, toggleFullscreen } = usePresentationNavigation(
         slides,
         currentSlideIndex,
-        setCurrentSlideIndex
+        setCurrentSlideIndex,
+        handleNextSlide,
+        handlePrevSlide
     );
 
     const {
@@ -72,9 +93,14 @@ export default function PresentationPage({ copticDate, seasonLabel, sections, sl
         }
     }, [currentSlideIndex, currentSlide, copticDate, seasonLabel, slides.length, broadcastSlide]);
 
-    // Trigger re-mount animation on slide change
+    // Trigger re-mount animation on slide change & reset scroll position completely
     useEffect(() => {
         setSlideKey(prev => prev + 1);
+        
+        const mainArea = document.querySelector('main.no-scrollbar');
+        if (mainArea) {
+            mainArea.scrollTo({ top: 0, behavior: 'smooth' });
+        }
     }, [currentSlideIndex]);
 
     // Keyboard shortcuts
@@ -127,7 +153,7 @@ export default function PresentationPage({ copticDate, seasonLabel, sections, sl
 
     const handleSearchResultClick = (item: any) => {
         setSearchOpen(false);
-        const idx = slides.findIndex(s => s.id === `slide-${item.section_code}-${item.reading_id}`);
+        const idx = slides.findIndex(s => s.id === item.id);
         if (idx !== -1) {
             setCurrentSlideIndex(idx);
         }
@@ -136,7 +162,11 @@ export default function PresentationPage({ copticDate, seasonLabel, sections, sl
     const progressPercent = ((currentSlideIndex + 1) / slides.length) * 100;
 
     return (
-        <div className="presentation-bg relative min-h-screen overflow-hidden selection:bg-primary/30 flex flex-col font-sans" dir="rtl">
+        <div 
+            className="presentation-bg relative min-h-screen overflow-hidden selection:bg-primary/30 flex flex-col font-sans" 
+            dir="rtl"
+            style={{ '--pres-font-size': `${zoomLevel}px` } as React.CSSProperties}
+        >
             <Head title={`عرض - ${copticDate}`} />
 
             {/* ═══════ Top Toolbar ═══════ */}
@@ -223,6 +253,7 @@ export default function PresentationPage({ copticDate, seasonLabel, sections, sl
                 open={searchOpen}
                 onOpenChange={setSearchOpen}
                 onResultClick={handleSearchResultClick}
+                slides={slides}
             />
 
             {/* ═══════ Main Slide Area ═══════ */}
@@ -250,8 +281,9 @@ export default function PresentationPage({ copticDate, seasonLabel, sections, sl
                         </div>
 
                         {/* ─── Slide Content ─── */}
-                        <div className="slide-content-enter w-full px-2 md:px-6 lg:px-12">
+                        <div className="slide-content-enter w-full px-2 md:px-6 lg:px-12 pb-24">
                             <SplitViewReader
+                                ref={readerRef}
                                 lines={currentSlide.lines}
                                 hasCoptic={currentSlide.has_coptic}
                                 justified={true}
@@ -270,8 +302,8 @@ export default function PresentationPage({ copticDate, seasonLabel, sections, sl
                         size="icon"
                         variant="ghost"
                         className="h-10 w-10 md:h-12 md:w-12 rounded-full hover:bg-muted disabled:opacity-30 text-foreground"
-                        onClick={prevSlide}
-                        disabled={currentSlideIndex === 0}
+                        onClick={handlePrevSlide}
+                        disabled={currentSlideIndex === 0 && readerRef.current?.isFirstPage}
                         aria-label="الشريحة السابقة"
                     >
                         <ChevronRight className="h-6 w-6 md:h-7 md:w-7" />
@@ -290,13 +322,35 @@ export default function PresentationPage({ copticDate, seasonLabel, sections, sl
                         size="icon"
                         variant="ghost"
                         className="h-10 w-10 md:h-12 md:w-12 rounded-full hover:bg-muted disabled:opacity-30 text-foreground"
-                        onClick={nextSlide}
-                        disabled={currentSlideIndex === slides.length - 1}
+                        onClick={handleNextSlide}
+                        disabled={currentSlideIndex === slides.length - 1 && readerRef.current?.isLastPage}
                         aria-label="الشريحة التالية"
                     >
                         <ChevronLeft className="h-6 w-6 md:h-7 md:w-7" />
                     </Button>
                 </div>
+            </div>
+
+            {/* Floating Zoom Controls (Session Only) */}
+            <div className={`fixed bottom-24 left-4 z-40 flex flex-col gap-2 transition-all duration-500 ${isFullscreen ? 'opacity-0 hover:opacity-100' : ''}`}>
+                <Button 
+                    size="icon" 
+                    variant="secondary" 
+                    className="h-10 w-10 rounded-full shadow-lg opacity-80 hover:opacity-100"
+                    onClick={() => setZoomLevel(prev => Math.min(prev + 2, 80))}
+                    title="تكبير الخط"
+                >
+                    <Plus className="h-5 w-5" />
+                </Button>
+                <Button 
+                    size="icon" 
+                    variant="secondary" 
+                    className="h-10 w-10 rounded-full shadow-lg opacity-80 hover:opacity-100"
+                    onClick={() => setZoomLevel(prev => Math.max(prev - 2, 16))}
+                    title="تصغير الخط"
+                >
+                    <Minus className="h-5 w-5" />
+                </Button>
             </div>
 
         </div>
