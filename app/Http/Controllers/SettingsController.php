@@ -13,10 +13,8 @@ class SettingsController extends Controller
     {
         $churchSettingsRaw = $request->cookie('church_settings');
         $churchSettings = $churchSettingsRaw ? json_decode($churchSettingsRaw, true) : null;
-        
         return Inertia::render('Settings', [
             'lastUpdated' => Setting::getValue('last_content_update'),
-            'appVersion' => config('app.version', '1.0.0'),
             'currentReadingsVersion' => Setting::getValue('readings_version'),
             'initialChurchData' => $churchSettings ?? [],
             'patronsList' => config('church.patrons', []),

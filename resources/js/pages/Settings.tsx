@@ -15,9 +15,10 @@ import {
     Trash2,
     ChevronDown,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from '@inertiajs/react';
 import Cookies from 'js-cookie';
+import { GitHubSyncService, SyncProgress } from '@/services/GitHubSyncService';
 
 type Bishop = {
     name: string;
@@ -42,7 +43,16 @@ export default function Settings({
 }: Props) {
     const { appearance, updateAppearance } = useAppearance();
     const [checkingUpdates, setCheckingUpdates] = useState(false);
-    const [updateResult, setUpdateResult] = useState<'none' | 'available' | 'error' | null>(null);
+    const [updateResult, setUpdateResult] = useState<'none' | 'available' | 'error' | 'syncing' | 'completed' | null>(null);
+    const [syncProgress, setSyncProgress] = useState<SyncProgress>({ total: 0, current: 0, currentFile: '', status: 'checking' });
+    const [localVersionInfo, setLocalVersionInfo] = useState<{version: string, last_updated: string} | null>(null);
+
+    useEffect(() => {
+        const stored = localStorage.getItem('app_content_version');
+        if (stored) {
+            setLocalVersionInfo(JSON.parse(stored));
+        }
+    }, []);
 
     // Inertia Form لبيانات الكنيسة والخدمة
     const { data, setData, post, processing, recentlySuccessful } = useForm({
@@ -114,9 +124,31 @@ export default function Settings({
         setCheckingUpdates(true);
         setUpdateResult(null);
         try {
-            await new Promise((resolve) => setTimeout(resolve, 1500));
-            setUpdateResult('none');
-        } catch {
+            const syncService = new GitHubSyncService();
+            
+            syncService.onProgress = (progress) => {
+                if (progress.status === 'downloading') {
+                    setUpdateResult('syncing');
+                    setSyncProgress(progress);
+                }
+            };
+
+            const hasUpdates = await syncService.checkForUpdates();
+            
+            if (!hasUpdates) {
+                setUpdateResult('none');
+                setCheckingUpdates(false);
+                return;
+            }
+
+            setUpdateResult('syncing');
+
+            const updatedVersion = await syncService.performSync();
+            setLocalVersionInfo(updatedVersion);
+            setUpdateResult('completed');
+
+        } catch (error) {
+            console.error('Update failed:', error);
             setUpdateResult('error');
         } finally {
             setCheckingUpdates(false);
@@ -317,35 +349,71 @@ export default function Settings({
                                 <span>آخر تحديث:</span>
                             </div>
                             <span className="text-sm font-medium text-foreground">
-                                {lastUpdated || 'لم يتم التحديث بعد'}
+                                {localVersionInfo?.last_updated || lastUpdated || 'لم يتم التحديث بعد'}
                             </span>
                         </div>
 
-                        {currentReadingsVersion && (
+                        {(localVersionInfo?.version || currentReadingsVersion) && (
                             <div className="flex items-center justify-between rounded-xl bg-muted/50 px-4 py-3">
                                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                     <BookOpen className="h-4 w-4" />
                                     <span>إصدار القراءات:</span>
                                 </div>
                                 <span className="text-sm font-medium text-foreground">
-                                    {currentReadingsVersion}
+                                    {localVersionInfo?.version || currentReadingsVersion}
                                 </span>
                             </div>
                         )}
 
                         <button
                             onClick={checkForUpdates}
-                            disabled={checkingUpdates}
+                            disabled={checkingUpdates || updateResult === 'syncing'}
                             className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:opacity-90 disabled:opacity-60 active:scale-[0.98]"
                         >
-                            <RefreshCw className={`h-4 w-4 ${checkingUpdates ? 'animate-spin' : ''}`} />
-                            {checkingUpdates ? 'جاري التحقق...' : 'التحقق من التحديثات'}
+                            <RefreshCw className={`h-4 w-4 ${checkingUpdates || updateResult === 'syncing' ? 'animate-spin' : ''}`} />
+                            {updateResult === 'syncing' ? 'جاري التزامن...' : checkingUpdates ? 'جاري التحقق...' : 'التحقق من التحديثات'}
                         </button>
+
+                        {updateResult === 'syncing' && (
+                            <div className="space-y-2 rounded-xl bg-blue-50 px-4 py-3 dark:bg-blue-950/20 animate-in fade-in slide-in-from-top-1 duration-200">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-sm font-medium text-blue-700 dark:text-blue-400">
+                                        جاري تحديث الملفات... ({syncProgress.current} من {syncProgress.total})
+                                    </span>
+                                    <span className="text-xs text-blue-600/70 dark:text-blue-400/70">
+                                        {Math.round((syncProgress.current / (syncProgress.total || 1)) * 100)}%
+                                    </span>
+                                </div>
+                                <div className="w-full bg-blue-200 dark:bg-blue-900/40 rounded-full h-1.5 mt-2">
+                                    <div 
+                                        className="bg-blue-600 dark:bg-blue-500 h-1.5 rounded-full transition-all duration-300" 
+                                        style={{ width: `${(syncProgress.current / (syncProgress.total || 1)) * 100}%` }}
+                                    ></div>
+                                </div>
+                                <p className="text-[10px] text-blue-500 truncate mt-1 text-left ltr" dir="ltr">
+                                    {syncProgress.currentFile}
+                                </p>
+                            </div>
+                        )}
+
+                        {updateResult === 'completed' && (
+                            <div className="flex items-center gap-2 rounded-xl bg-emerald-50 px-4 py-3 dark:bg-emerald-950/20 animate-in fade-in slide-in-from-top-1 duration-200">
+                                <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                                <span className="text-sm font-medium text-emerald-700 dark:text-emerald-400">تم التحديث بنجاح إلى إصدار {localVersionInfo?.version}</span>
+                            </div>
+                        )}
 
                         {updateResult === 'none' && (
                             <div className="flex items-center gap-2 rounded-xl bg-emerald-50 px-4 py-3 dark:bg-emerald-950/20 animate-in fade-in slide-in-from-top-1 duration-200">
                                 <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                                 <span className="text-sm font-medium text-emerald-700 dark:text-emerald-400">لا توجد تحديثات جديدة</span>
+                            </div>
+                        )}
+
+                        {updateResult === 'error' && (
+                            <div className="flex items-center gap-2 rounded-xl bg-red-50 px-4 py-3 dark:bg-red-950/20 animate-in fade-in slide-in-from-top-1 duration-200">
+                                <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
+                                <span className="text-sm font-medium text-red-700 dark:text-red-400">حدث خطأ أثناء الاتصال بالخادم. يرجى المحاولة.</span>
                             </div>
                         )}
                     </div>

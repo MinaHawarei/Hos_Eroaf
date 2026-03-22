@@ -185,11 +185,25 @@ export default function HosLayout({ title = '', breadcrumbs = [], children }: Pr
                     {children}
                 </main>
 
-                {/* Footer */}
-                <footer className="border-t border-border bg-card/50">
-                    <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6">
-                        <p className="text-center text-xs text-muted-foreground">
+               {/* Footer */}
+                <footer className="border-t border-border bg-card/30 py-6">
+                    <div className="mx-auto max-w-7xl px-4 flex flex-col items-center justify-center text-center gap-2">
+                        {/* اسم التطبيق والوصف */}
+                        <p className="text-sm font-medium text-foreground/80">
                             هوس إيروف — تطبيق القراءات الكنسية القبطية الأرثوذكسية
+                        </p>
+
+                        {/* رقم الإصدار مع تنسيق بسيط */}
+                        <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-muted-foreground opacity-60" dir="ltr">
+                            <span>VERSION</span>
+                            <span className="font-mono bg-muted px-1.5 py-0.5 rounded">
+                                {(usePage().props as any).appVersion || '1.0.0'}
+                            </span>
+                        </div>
+
+                        {/* اختياري: إضافة جملة حقوق بسيطة أو سنة التطوير */}
+                        <p className="text-[10px] text-muted-foreground/40 mt-1">
+                            © {new Date().getFullYear()} جميع الحقوق محفوظة
                         </p>
                     </div>
                 </footer>

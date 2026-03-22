@@ -35,9 +35,19 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
+        $appVersion = '1.0.0';
+        $versionPath = base_path('version.json');
+        if (file_exists($versionPath)) {
+            $versionData = json_decode(file_get_contents($versionPath), true);
+            if (isset($versionData['version'])) {
+                $appVersion = $versionData['version'];
+            }
+        }
+
         return [
             ...parent::share($request),
             'name' => config('app.name'),
+            'appVersion' => $appVersion,
             'auth' => [
                 'user' => $request->user(),
             ],
