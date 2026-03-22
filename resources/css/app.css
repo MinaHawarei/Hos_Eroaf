@@ -467,37 +467,49 @@
     animation: fadeSlideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.15s both;
 }
 
-/* --- Responsive Slide Scaling --- */
+/* --- Slide body text: tied to settings + zoom (--pres-font-size on .presentation-bg) --- */
+.pres-slide-body-text {
+    font-size: var(--pres-font-size, 28px);
+}
+
+.pres-speaker-badge {
+    font-size: clamp(0.8rem, calc(var(--pres-font-size, 28px) * 0.38), 1.35rem);
+}
+
+.pres-speaker-badge-lg {
+    font-size: clamp(0.85rem, calc(var(--pres-font-size, 28px) * 0.42), 1.85rem);
+}
+
+.pres-section-header-scale {
+    font-size: clamp(1.1rem, calc(var(--pres-font-size, 28px) * 0.55), 2.1rem);
+}
+
+.pres-intonation-scale {
+    font-size: clamp(0.8rem, calc(var(--pres-font-size, 28px) * 0.36), 1.15rem);
+}
+
+.pres-slide-column {
+    position: relative;
+    z-index: 1;
+}
+
+/* --- Responsive Slide viewport (no nested scroll; height from flex parent) --- */
 .slide-viewport {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     width: 100%;
-    min-height: calc(100vh - 8rem);
-    padding: 2rem;
+    flex: 1;
+    min-height: 0;
+    padding: 1rem;
     position: relative;
     z-index: 1;
 }
 
-@media (min-width: 1920px) {
-    .slide-viewport {
-        transform: scale(1.1);
-        transform-origin: center center;
-    }
-}
-
-@media (min-width: 2560px) {
-    .slide-viewport {
-        transform: scale(1.25);
-        transform-origin: center center;
-    }
-}
-
 @media (max-width: 768px) {
     .slide-viewport {
-        padding: 1rem;
-        min-height: calc(100vh - 6rem);
+        padding: 0.75rem;
     }
 }
 

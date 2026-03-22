@@ -2,34 +2,31 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\ReadingDay;
-use App\Models\ReadingSection;
-use App\Services\ReadingResolverService;
-use Carbon\Carbon;
+use App\Services\ContentService;
+use App\Services\PresentationSearchService;
+use App\Support\ReadingLineAssembler;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
-use Inertia\Response;
-use App\Services\ContentService;
 
 class PresentationController extends Controller
 {
-
-
-    public function lectionary(Request $request, string $dayKey , ContentService $content)
+    public function lectionary(Request $request, string $dayKey, ContentService $content)
     {
         try {
             $dayData = $content->getLectionary($dayKey);
         } catch (\Exception $e) {
-            //return redirect()->route('home');
+            // return redirect()->route('home');
         }
 
-        if (!$dayData) {
+        if (! $dayData) {
             return Inertia::render('PresentationPage', [
                 'dayKey' => $dayKey,
                 'copticDate' => '',
                 'seasonLabel' => '',
                 'sections' => [],
                 'slides' => [],
+                'defaultBaseFontSize' => (int) config('presentation.default_base_font_size', 28),
             ]);
         }
 
@@ -41,34 +38,46 @@ class PresentationController extends Controller
         // ✅ Transform sections - using title_ar from JSON
         $sections = collect($sectionsRaw)
             ->map(function ($items, $key) {
-                // Each section has an array of readings (usually one item)
+                if (! is_array($items)) {
+                    return null;
+                }
+
                 $firstReading = $items[0] ?? null;
 
-                // Get section name from title_ar or use fallback
-                $sectionName = $firstReading['title_ar'] ;
+                $sectionName = match (true) {
+                    is_array($firstReading) => $firstReading['title_ar'] ?? $key,
+                    is_string($firstReading) => $firstReading,
+                    default => $key,
+                };
 
                 return [
                     'id' => $key,
                     'code' => $key,
                     'name_ar' => $sectionName,
-                    'readings' => collect($items)->map(function ($reading, $index) use ($sectionName) {
-                        // Build lines first to determine if has_coptic
-                        $lines = $this->buildLines($reading);
-                        $hasCoptic = collect($lines)->contains('lang_type', 'coptic_arabized');
+                    'readings' => collect($items)
+                        ->map(function ($reading, $index) use ($sectionName) {
+                            if (! is_array($reading) || ! isset($reading['text_ar'])) {
+                                return null;
+                            }
 
-                        return [
-                            'id' => $index + 1,
-                            'title_ar' => $reading['title_ar'] ?? $sectionName,
-                            'intonation_ar' => $reading['intonation_ar'] ?? null,
-                            'intonation_co' => $reading['intonation_co'] ?? null,
-                            'has_coptic' => $hasCoptic,
-                            'lines' => $lines,
-                            'style' => 1,
-                        ];
-                    })->values(),
+                            $lines = ReadingLineAssembler::buildLines($reading);
+                            $hasCoptic = ReadingLineAssembler::readingHasCoptic($lines);
+
+                            return [
+                                'id' => $index + 1,
+                                'title_ar' => $reading['title_ar'] ?? $sectionName,
+                                'intonation_ar' => $reading['intonation_ar'] ?? null,
+                                'intonation_co' => $reading['intonation_co'] ?? null,
+                                'has_coptic' => $hasCoptic,
+                                'lines' => $lines,
+                                'style' => 1,
+                            ];
+                        })
+                        ->filter()
+                        ->values(),
                 ];
             })
-            ->filter(fn ($s) => $s['readings']->isNotEmpty())
+            ->filter(fn ($s) => $s !== null && $s['readings']->isNotEmpty())
             ->values();
 
         // ✅ Build slides using title_ar
@@ -80,7 +89,7 @@ class PresentationController extends Controller
                     continue;
                 }
 
-                $hasCoptic = collect($reading['lines'])->contains('lang_type', 'coptic_arabized');
+                $hasCoptic = ReadingLineAssembler::readingHasCoptic($reading['lines']);
 
                 $slides[] = [
                     'id' => "slide-{$section['code']}-{$reading['id']}",
@@ -102,6 +111,7 @@ class PresentationController extends Controller
                 'seasonLabel' => '',
                 'sections' => [],
                 'slides' => [],
+                'defaultBaseFontSize' => (int) config('presentation.default_base_font_size', 28),
             ]);
         }
 
@@ -111,14 +121,16 @@ class PresentationController extends Controller
             'seasonLabel' => $dayData['seasonLabel'] ?? $this->extractSeasonFromDate($copticDate),
             'sections' => $sections,
             'slides' => $slides,
+            'defaultBaseFontSize' => (int) config('presentation.default_base_font_size', 28),
         ]);
     }
+
     public function liturgy(Request $request, ContentService $content)
     {
 
-        $dayKey  = (int)$request->input('dayKey.dayKey');
+        $dayKey = (int) $request->input('dayKey.dayKey');
         $dayName = $request->input('dayName.dayName');
-        $season  = $request->input('season.season');
+        $season = $request->input('season.season');
 
         $churchSettingsRaw = $request->cookie('church_settings');
         $churchSettings = [];
@@ -132,17 +144,17 @@ class PresentationController extends Controller
         $visiting_bishops = $churchSettings['visiting_bishops'] ?? [];
 
         $data = [
-            "dayKey" => $dayKey ,
-            "dayName"=> $dayName,
-            "season" => $season,
-            "popename" => $popename,
-            "patron" => $patron,
-            "diocesan_bishop" => $diocesan_bishop,
-            "visiting_bishops" => $visiting_bishops,
+            'dayKey' => $dayKey,
+            'dayName' => $dayName,
+            'season' => $season,
+            'popename' => $popename,
+            'patron' => $patron,
+            'diocesan_bishop' => $diocesan_bishop,
+            'visiting_bishops' => $visiting_bishops,
             // Fallbacks for compatibility if ContentService relies on old keys
-            "bishoprole" => $diocesan_bishop['role'] ?? 'أسقف',
-            "bishopCoRole" => $diocesan_bishop['coRole'] ?? 'أبيسكوبوس',
-            "bishopname" => $diocesan_bishop['name'] ?? ''
+            'bishoprole' => $diocesan_bishop['role'] ?? 'أسقف',
+            'bishopCoRole' => $diocesan_bishop['coRole'] ?? 'أبيسكوبوس',
+            'bishopname' => $diocesan_bishop['name'] ?? '',
         ];
 
         try {
@@ -151,30 +163,31 @@ class PresentationController extends Controller
             return redirect()->route('home');
         }
 
-        if (!$Data) {
+        if (! $Data) {
             return Inertia::render('PresentationPage', [
                 'dayKey' => $dayKey,
                 'copticDate' => '',
                 'sections' => [],
                 'slides' => [],
+                'defaultBaseFontSize' => (int) config('presentation.default_base_font_size', 28),
             ]);
         }
 
         // ✅ تحويل البيانات مع دمج المتحدثين في كل قسم
         $sections = collect($Data)->map(function ($sectionData, $key) {
             $items = $sectionData['content'] ?? [];
-            $sectionTitle = $sectionData['title'] ;
+            $sectionTitle = $sectionData['title'];
 
             // --- التعديل الجوهري هنا: دمج كل الأسطر من جميع المتحدثين في مصفوفة واحدة ---
             $allLinesInOneReading = [];
             foreach ($items as $readingPart) {
                 // نستخدم دالتك buildLines لجلب أسطر هذا المتحدث
-                $partLines = $this->buildLines($readingPart);
+                $partLines = ReadingLineAssembler::buildLines($readingPart);
                 // ندمجها مع المصفوفة الكبيرة للقسم
                 $allLinesInOneReading = array_merge($allLinesInOneReading, $partLines);
             }
 
-            $hasCoptic = collect($allLinesInOneReading)->contains('lang_type', 'coptic_arabized');
+            $hasCoptic = ReadingLineAssembler::readingHasCoptic($allLinesInOneReading);
 
             return [
                 'id' => $key,
@@ -188,7 +201,7 @@ class PresentationController extends Controller
                         'has_coptic' => $hasCoptic,
                         'lines' => $allLinesInOneReading, // الأسطر المدمجة
                         'style' => 1,
-                    ]
+                    ],
                 ],
             ];
         })->values();
@@ -199,7 +212,9 @@ class PresentationController extends Controller
             // بما أن كل قسم لديه مصفوفة readings فيها عنصر واحد فقط الآن
             $reading = $section['readings'][0];
 
-            if (empty($reading['lines'])) continue;
+            if (empty($reading['lines'])) {
+                continue;
+            }
 
             $slides[] = [
                 'id' => "slide-{$section['code']}",
@@ -216,64 +231,26 @@ class PresentationController extends Controller
             'dayKey' => $dayKey,
             'sections' => $sections,
             'slides' => $slides,
+            'defaultBaseFontSize' => (int) config('presentation.default_base_font_size', 28),
         ]);
     }
 
-    /**
-     * Build lines array from Arabic and Coptic text
-     */
-    private function buildLines(array $reading): array
+    public function search(Request $request, PresentationSearchService $presentationSearchService): JsonResponse
     {
-        $lines = [];
-        $lineOrder = 0;
-        // جلب القائل (الكاهن، الشعب، إلخ)
-        $speaker = $reading['speaker'] ?? null;
-
-        $textAr = $reading['text_ar'] ?? [];
-        $textCo = $reading['text_co'] ?? [];
-        $textArCo = $reading['text_ar_co'] ?? [];
-
-        $maxLines = max(count($textAr), count($textCo), count($textArCo));
-
-        for ($i = 0; $i < $maxLines; $i++) {
-            $arText = $textAr[$i] ?? '';
-            $coText = $textCo[$i] ?? '';
-            $arCoText = $textArCo[$i] ?? '';
-
-            // نرسل الـ speaker مع أول سطر فقط في المجموعة أو مع كل الأسطر حسب تفضيلك
-            // هنا سأرسله مع كل سطر ليتمكن الـ Frontend من معرفة صاحب النص
-
-            if (!empty($arText)) {
-                $lines[] = [
-                    'id' => $lineOrder++,
-                    'lang_type' => 'arabic',
-                    'text' => $arText,
-                    'speaker' => $speaker // إدراج القائل هنا
-                ];
-            }
-
-            if (!empty($arCoText)) {
-                $lines[] = [
-                    'id' => $lineOrder++,
-                    'lang_type' => 'coptic_arabized',
-                    'text' => $arCoText,
-                    'speaker' => $speaker
-                ];
-            }
-
-            if (!empty($coText)) {
-                $lines[] = [
-                    'id' => $lineOrder++,
-                    'lang_type' => 'coptic',
-                    'text' => $coText,
-                    'speaker' => $speaker
-                ];
-            }
+        $q = $request->query('q', '');
+        if (! is_string($q)) {
+            return response()->json(['results' => []]);
         }
 
-        return $lines;
-    }
+        $q = trim($q);
+        if (mb_strlen($q) < 2) {
+            return response()->json(['results' => []]);
+        }
 
+        return response()->json([
+            'results' => $presentationSearchService->search($q),
+        ]);
+    }
 
     /**
      * Extract season from Coptic date (you can enhance this)
