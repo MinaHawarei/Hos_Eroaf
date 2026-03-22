@@ -141,35 +141,31 @@ class ReadingResolverService
             - 32045;
     }
 
-    /**
- * حساب عيد القيامة الغربي برمجياً بدون الاعتماد على إضافة Calendar
- * هذه الخوارزمية تضمن أن يكون العيد يوم 5 أبريل في عام 2026.
- */
-public function calculateEaster(int $year): Carbon
-{
-    // حساب عيد القيامة الأرثوذكسي (التقويم اليولياني)
-    $a = $year % 19;
-    $b = $year % 4;
-    $c = $year % 7;
-    $ra = (19 * $a + 15) % 30;
-    $rb = (2 * $b + 4 * $c + 6 * $ra + 6) % 7;
 
-    $days = $ra + $rb;
+    public function calculateEaster(int $year): Carbon
+    {
+        // حساب عيد القيامة الأرثوذكسي (التقويم اليولياني)
+        $a = $year % 19;
+        $b = $year % 4;
+        $c = $year % 7;
+        $ra = (19 * $a + 15) % 30;
+        $rb = (2 * $b + 4 * $c + 6 * $ra + 6) % 7;
 
-    // التاريخ بالتقويم اليولياني يكون إما في مارس أو أبريل
-    if ($days > 9) {
-        $month = 4;
-        $day = $days - 9;
-    } else {
-        $month = 3;
-        $day = $days + 22;
+        $days = $ra + $rb;
+
+        // التاريخ بالتقويم اليولياني يكون إما في مارس أو أبريل
+        if ($days > 9) {
+            $month = 4;
+            $day = $days - 9;
+        } else {
+            $month = 3;
+            $day = $days + 22;
+        }
+
+        $easter = Carbon::createFromDate($year, $month, $day)->addDays(13);
+
+        return $easter;
     }
-
-
-    $easter = Carbon::createFromDate($year, $month, $day)->addDays(13);
-
-    return $easter;
-}
 
     public function determineSeason(Carbon $date, int $copticDay, int $copticMonth): string
     {
