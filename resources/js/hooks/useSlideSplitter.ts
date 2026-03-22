@@ -43,6 +43,8 @@ export function useSlideSplitter(slides: OriginalSlide[], baseFontSize: number =
             dualRow: (ar: string, copAr: string) => paginator.measureDualColumnRowHeight(ar, copAr),
             tripleRow: (ar: string, copAr: string, cop: string) =>
                 paginator.measureTripleColumnRowHeight(ar, copAr, cop),
+            splitOverflowRow: (a: string, b: string, c: string, t: boolean, m: number) =>
+                paginator.splitOverflowRow(a, b, c, t, m),
         };
 
         const result: SplitSlide[] = [];

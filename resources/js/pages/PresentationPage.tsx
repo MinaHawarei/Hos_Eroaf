@@ -341,7 +341,7 @@ export default function PresentationPage({
 
             <main
                 ref={mainRef}
-                className="flex min-h-0 flex-1 flex-col items-stretch justify-start overflow-hidden px-2 pt-4 md:px-4 md:pt-5"
+                className="flex min-h-0 flex-1 flex-col items-stretch justify-start overflow-hidden px-8 pt-4 md:px-10 md:pt-5"
             >
                 <div className="pres-slide-column flex min-h-0 w-full max-w-none flex-1 flex-col">
                     <div className="flex w-full flex-shrink-0 flex-col items-center">

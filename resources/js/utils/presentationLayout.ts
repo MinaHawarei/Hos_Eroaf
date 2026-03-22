@@ -4,6 +4,9 @@
  */
 export const PRES_BODY_LEADING_CLASS = 'leading-[1.55]';
 
+/** Matches SplitViewReader vertical spacing between row blocks (`space-y-3`). */
+export const PRES_ROW_BLOCK_STACK_GAP_PX = 12;
+
 export type MultiColumnMode = 'single' | 'dual' | 'triple';
 
 export function speakerBlockExtraPx(fontSizePx: number): number {
@@ -21,6 +24,14 @@ export function paginationOverflowCeiling(budgetPx: number, tolerancePx: number)
  */
 export function paginationTolerancePx(budgetPx: number): number {
     return Math.min(88, Math.max(28, Math.round(budgetPx * 0.14)));
+}
+
+/**
+ * Reserve height from the measured slot so pagination stays inside the viewport
+ * (line-height rounding, flex gaps, and safe padding).
+ */
+export function paginationVerticalReservePx(fontSizePx: number): number {
+    return Math.max(10, Math.ceil(fontSizePx * 0.42) + 6);
 }
 
 export function linesHaveCopticScript(

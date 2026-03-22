@@ -472,6 +472,19 @@
     font-size: var(--pres-font-size, 28px);
 }
 
+/* Justified blocks: Tailwind `text-justify` + last-line alignment for RTL/LTR */
+.pres-arabic-justify {
+    text-align: justify;
+    text-align-last: start;
+    word-spacing: 0.04em;
+}
+
+.pres-ltr-justify {
+    text-align: justify;
+    text-align-last: start;
+    word-spacing: 0.04em;
+}
+
 .pres-speaker-badge {
     font-size: clamp(0.8rem, calc(var(--pres-font-size, 28px) * 0.38), 1.35rem);
 }

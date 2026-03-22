@@ -63,14 +63,18 @@ const rowGapClass = 'gap-3 md:gap-4';
 function bodyParagraphClassNames(
     justified: boolean,
     extra?: string,
-    dirRtl?: boolean
+    isRtl: boolean = true
 ): string {
     return cn(
-        // تم إضافة break-words لمنع النص من الخروج خارج الشاشة
         'pres-slide-body-text font-reading font-bold break-words',
         PRES_BODY_LEADING_CLASS,
-        // تم تعديل text-justified إلى text-justify
-        dirRtl !== false && (justified ? 'text-justify' : 'text-right'),
+        justified
+            ? isRtl
+                ? 'text-justify pres-arabic-justify'
+                : 'text-justify pres-ltr-justify'
+            : isRtl
+              ? 'text-right'
+              : 'text-left',
         extra
     );
 }
@@ -237,7 +241,7 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
                 <div
                     ref={measureRootRef}
                     className={cn(
-                        'flex h-full min-h-0 min-w-0 flex-1 flex-col items-stretch justify-start space-y-3 px-1 md:px-2',
+                        'flex h-full min-h-0 min-w-0 flex-1 flex-col items-stretch justify-start space-y-3 px-8 md:px-10',
                         className
                     )}
                 >
@@ -252,10 +256,7 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
                             >
                                 {shouldShowSpeaker && line.speaker && renderSpeakerBar(line.speaker, true)}
                                 <p
-                                    className={cn(
-                                        bodyParagraphClassNames(justified, 'text-foreground'),
-                                        line.lang_type === 'arabic' && '!text-center' // توسيط العربي
-                                    )}
+                                    className={bodyParagraphClassNames(justified, 'text-foreground')}
                                     dir="rtl"
                                     dangerouslySetInnerHTML={lineHtml(line, highlightQuery)}
                                 />
@@ -282,7 +283,7 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
             <div
                 ref={measureRootRef}
                 className={cn(
-                    'flex h-full min-h-0 min-w-0 flex-1 flex-col items-stretch justify-start space-y-3 px-1 md:px-2',
+                    'flex h-full min-h-0 min-w-0 flex-1 flex-col items-stretch justify-start space-y-3 px-8 md:px-10',
                     className
                 )}
             >
@@ -330,10 +331,7 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
                                         )}
                                     >
                                         <p
-                                            className={cn(
-                                                bodyParagraphClassNames(justified, 'text-foreground'),
-                                                '!text-center' // ⬅️ التوسيط الإجباري للنص العربي
-                                            )}
+                                            className={bodyParagraphClassNames(justified, 'text-foreground')}
                                             dir="rtl"
                                             dangerouslySetInnerHTML={lineHtml(ar, highlightQuery)}
                                         />
@@ -341,8 +339,10 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
                                 )}
 
                                 {showAr && (showArcop || (useThreeColLayout && showCop)) && (
-                                    // ⬅️ تم وضع الخط الفاصل بدلاً من الديف المخفي
-                                    <div className="hidden md:block w-[1px] bg-black dark:bg-slate-200 shrink-0" aria-hidden="true" />
+                                    <div
+                                        className="hidden md:block w-px shrink-0 self-stretch min-h-0 bg-black/25 dark:bg-white/25"
+                                        aria-hidden="true"
+                                    />
                                 )}
 
                                 {showArcop && arcop && (
@@ -354,10 +354,9 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
                                     >
                                         <p
                                             className={bodyParagraphClassNames(
-                                            justified,
-                                                // أضفنا px-6 لعمل مسافة آمنة من الجوانب (Padding)
-                                                // وأضفنا leading-relaxed لتحسين توزيع الأسطر مع الـ justify
-                                                '!text-[#880808] dark:!text-sky-400 !text-center px-6 sm:px-8 break-words'                                            )}
+                                                justified,
+                                                '!text-[#880808] dark:!text-sky-400 break-words'
+                                            )}
                                             dir="rtl"
                                             dangerouslySetInnerHTML={lineHtml(arcop, highlightQuery)}
                                         />
@@ -365,16 +364,19 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
                                 )}
 
                                 {useThreeColLayout && (showAr || showArcop) && showCop && (
-                                    // ⬅️ تم وضع الخط الفاصل بدلاً من الديف المخفي
-                                    <div className="hidden md:block w-[1px] bg-slate-200 dark:bg-slate-700 shrink-0" aria-hidden="true" />
+                                    <div
+                                        className="hidden md:block w-px shrink-0 self-stretch min-h-0 bg-black/25 dark:bg-white/25"
+                                        aria-hidden="true"
+                                    />
                                 )}
 
                                 {useThreeColLayout && showCop && cop && (
-                                    <div className="min-w-0 shrink-0 basis-full md:basis-[35%]">
+                                    <div className="min-w-0 shrink-0 basis-full break-words md:basis-[35%]">
                                         <p
-                                            className={cn(
-                                                bodyParagraphClassNames(justified, 'text-foreground', false),
-                                                'text-left'
+                                            className={bodyParagraphClassNames(
+                                                justified,
+                                                'text-foreground',
+                                                false
                                             )}
                                             dir="ltr"
                                             dangerouslySetInnerHTML={lineHtml(cop, highlightQuery)}
