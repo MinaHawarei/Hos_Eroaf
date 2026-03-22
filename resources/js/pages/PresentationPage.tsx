@@ -341,28 +341,28 @@ export default function PresentationPage({
 
             <main
                 ref={mainRef}
-                className="flex-1 min-h-0 flex flex-col items-stretch justify-center overflow-hidden pt-5 px-2 md:px-4"
+                className="flex min-h-0 flex-1 flex-col items-stretch justify-start overflow-hidden px-2 pt-4 md:px-4 md:pt-5"
             >
-                <div className="flex flex-col flex-1 min-h-0 max-w-7xl w-full mx-auto pres-slide-column">
-                    <div className="flex-shrink-0 flex flex-col items-center w-full">
-                        <div className="slide-section-header pres-section-header-scale mb-4 md:mb-6 text-center">
+                <div className="pres-slide-column flex min-h-0 w-full max-w-none flex-1 flex-col">
+                    <div className="flex w-full flex-shrink-0 flex-col items-center">
+                        <div className="slide-section-header pres-section-header-scale mb-3 text-center md:mb-4">
                             <span className="ornament" aria-hidden="true" />
                             <span>{currentSlide.section_name}</span>
                             <span className="ornament" aria-hidden="true" />
                         </div>
                         {currentSlide.intonation_ar && (
-                            <div className="mb-4 md:mb-6 intonation-badge pres-intonation-scale text-center">
+                            <div className="intonation-badge pres-intonation-scale mb-3 text-center md:mb-4">
                                 {currentSlide.intonation_ar}
                             </div>
                         )}
-                        <div className="ornamental-rule mb-4 md:mb-8">
+                        <div className="ornamental-rule mb-3 md:mb-4">
                             <span className="ornament-diamond" />
                         </div>
                     </div>
 
                     <div
                         ref={readerSlotRef}
-                        className="flex-1 min-h-0 w-full flex flex-col justify-center overflow-hidden"
+                        className="flex min-h-0 w-full flex-1 flex-col justify-start overflow-hidden"
                     >
                         <SplitViewReader
                             key={currentSlide.id}
@@ -370,7 +370,7 @@ export default function PresentationPage({
                             lines={currentSlide.lines}
                             hasCoptic={currentSlide.has_coptic}
                             justified={true}
-                            className="flex flex-col w-full"
+                            className="flex min-h-0 w-full min-w-0 flex-1 flex-col"
                             maxContentHeight={readerSlotHeight}
                             fontSizePx={effectiveFontSize}
                             highlightQuery={highlightQuery}

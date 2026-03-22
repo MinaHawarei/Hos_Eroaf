@@ -1,7 +1,24 @@
-import React, { useState, useEffect, useImperativeHandle, forwardRef, useCallback } from 'react';
+import React, {
+    useState,
+    useEffect,
+    useImperativeHandle,
+    forwardRef,
+    useCallback,
+    useRef,
+    useLayoutEffect,
+    useMemo,
+} from 'react';
 import { cn } from '@/lib/utils';
 import { TextPaginator } from '@/utils/TextPaginator';
 import { SearchService } from '@/services/SearchService';
+import { computeSlidePages } from '@/utils/computeSlidePages';
+import {
+    PRES_BODY_LEADING_CLASS,
+    linesHaveCopticScript,
+    paginationTolerancePx,
+    resolveMultiColumnMode,
+    type MultiColumnMode,
+} from '@/utils/presentationLayout';
 
 export interface Line {
     id: number;
@@ -15,9 +32,7 @@ export interface SplitViewReaderProps {
     hasCoptic: boolean;
     className?: string;
     justified?: boolean;
-    /** Available height (px) for paginated body content inside the slide. */
     maxContentHeight: number;
-    /** Base × zoom; must match --pres-font-size for accurate pagination. */
     fontSizePx: number;
     highlightQuery?: string;
     onPaginationMetaChange?: (meta: {
@@ -43,6 +58,23 @@ function lineHtml(line: Line, highlightQuery: string | undefined): { __html: str
     return { __html: SearchService.highlightMatch(highlightQuery, raw) };
 }
 
+const rowGapClass = 'gap-3 md:gap-4';
+
+function bodyParagraphClassNames(
+    justified: boolean,
+    extra?: string,
+    dirRtl?: boolean
+): string {
+    return cn(
+        // تم إضافة break-words لمنع النص من الخروج خارج الشاشة
+        'pres-slide-body-text font-reading font-bold break-words',
+        PRES_BODY_LEADING_CLASS,
+        // تم تعديل text-justified إلى text-justify
+        dirRtl !== false && (justified ? 'text-justify' : 'text-right'),
+        extra
+    );
+}
+
 export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderProps>(
     (
         {
@@ -59,6 +91,30 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
     ) => {
         const [currentPage, setCurrentPage] = useState(0);
         const [pages, setPages] = useState<Line[][]>([lines]);
+        const measureRootRef = useRef<HTMLDivElement>(null);
+        const [contentWidthPx, setContentWidthPx] = useState(0);
+
+        const hasCopticScript = useMemo(() => linesHaveCopticScript(lines), [lines]);
+        const columnMode: MultiColumnMode = resolveMultiColumnMode(hasCoptic, hasCopticScript);
+
+        useLayoutEffect(() => {
+            const el = measureRootRef.current;
+            if (!el || typeof ResizeObserver === 'undefined') {
+                return;
+            }
+            const apply = (w: number) => {
+                if (w > 0) {
+                    setContentWidthPx(Math.floor(w));
+                }
+            };
+            apply(el.getBoundingClientRect().width);
+            const ro = new ResizeObserver((entries) => {
+                const w = entries[0]?.contentRect.width;
+                apply(w ?? 0);
+            });
+            ro.observe(el);
+            return () => ro.disconnect();
+        }, []);
 
         const emitMeta = useCallback(
             (page: number, pgs: Line[][]) => {
@@ -82,110 +138,36 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
                 return;
             }
 
-            const budget = Math.max(80, maxContentHeight);
-            const paginator = new TextPaginator('slide-content-enter', fontSizePx);
-            const computedPages: Line[][] = [];
+            const widthForMeasure = Math.max(
+                280,
+                contentWidthPx || (typeof window !== 'undefined' ? window.innerWidth - 64 : 960)
+            );
+            const tolerance = paginationTolerancePx(maxContentHeight);
+            const paginator = new TextPaginator('slide-content-enter', fontSizePx, widthForMeasure);
+            paginator.setContentWidth(widthForMeasure);
 
-            if (hasCoptic) {
-                const arabicLines = lines.filter((l) => l.lang_type === 'arabic');
-                const arcopticLines = lines.filter((l) => l.lang_type === 'coptic_arabized');
-                const copticLines = lines.filter((l) => l.lang_type === 'coptic');
+            const measureAdapter = {
+                arabicParagraph: (t: string) => paginator.measureArabicParagraphHeight(t),
+                dualRow: (ar: string, copAr: string) => paginator.measureDualColumnRowHeight(ar, copAr),
+                tripleRow: (ar: string, copAr: string, cop: string) =>
+                    paginator.measureTripleColumnRowHeight(ar, copAr, cop),
+            };
 
-                const maxLen = Math.max(arabicLines.length, arcopticLines.length, copticLines.length);
-                let currentHeight = 0;
-                let currentChunk: Line[] = [];
-
-                for (let i = 0; i < maxLen; i++) {
-                    const ar = arabicLines[i];
-                    const copAr = arcopticLines[i];
-                    const cop = copticLines[i];
-
-                    const h = paginator.measureTripleColumnRowHeight(
-                        ar?.text ?? '',
-                        copAr?.text ?? '',
-                        cop?.text ?? ''
-                    );
-
-                    const prevRowSpeaker =
-                        i > 0
-                            ? arabicLines[i - 1]?.speaker ||
-                              arcopticLines[i - 1]?.speaker ||
-                              copticLines[i - 1]?.speaker ||
-                              null
-                            : null;
-                    const rowSpeaker =
-                        ar?.speaker || arcopticLines[i]?.speaker || copticLines[i]?.speaker || null;
-                    const speakerChanged = Boolean(rowSpeaker && rowSpeaker !== prevRowSpeaker && i > 0);
-                    const rowCost = h + (speakerChanged ? 72 : 0);
-
-                    if (currentHeight + rowCost > budget && currentChunk.length > 0) {
-                        computedPages.push(currentChunk);
-                        currentChunk = [];
-                        currentHeight = 0;
-                    }
-
-                    if (ar) {
-                        currentChunk.push(ar);
-                    }
-                    if (copAr) {
-                        currentChunk.push(copAr);
-                    }
-                    if (cop) {
-                        currentChunk.push(cop);
-                    }
-
-                    currentHeight += rowCost;
-                }
-
-                if (currentChunk.length > 0) {
-                    computedPages.push(currentChunk);
-                }
-            } else {
-                let currentHeight = 0;
-                let currentChunk: Line[] = [];
-
-                for (let i = 0; i < lines.length; i++) {
-                    const line = lines[i];
-                    const prev = lines[i - 1];
-                    const speakerChanged = Boolean(
-                        line.speaker && line.speaker !== prev?.speaker && i > 0
-                    );
-                    const h = paginator.measureArabicParagraphHeight(line.text) + (speakerChanged ? 72 : 0);
-
-                    if (h > budget) {
-                        if (currentChunk.length > 0) {
-                            computedPages.push(currentChunk);
-                            currentChunk = [];
-                            currentHeight = 0;
-                        }
-
-                        const chunks = paginator.paginate(line.text, budget);
-                        chunks.forEach((chunk) => {
-                            computedPages.push([{ ...line, text: chunk }]);
-                        });
-                        continue;
-                    }
-
-                    if (currentHeight + h > budget && currentChunk.length > 0) {
-                        computedPages.push(currentChunk);
-                        currentChunk = [];
-                        currentHeight = 0;
-                    }
-
-                    currentChunk.push(line);
-                    currentHeight += h;
-                }
-
-                if (currentChunk.length > 0) {
-                    computedPages.push(currentChunk);
-                }
-            }
+            const computedPages = computeSlidePages(
+                lines,
+                columnMode,
+                maxContentHeight,
+                tolerance,
+                fontSizePx,
+                measureAdapter,
+                (text, maxH) => paginator.paginate(text, maxH)
+            );
 
             paginator.cleanup();
             const finalPages = computedPages.length > 0 ? computedPages : [lines];
             setPages(finalPages);
             emitMeta(0, finalPages);
-        }, [lines, hasCoptic, maxContentHeight, fontSizePx, emitMeta]);
+        }, [lines, columnMode, maxContentHeight, fontSizePx, contentWidthPx, emitMeta]);
 
         useEffect(() => {
             emitMeta(currentPage, pages);
@@ -217,9 +199,7 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
         const currentLines = pages[currentPage] || [];
 
         const getSpeakerStyles = (speaker?: string) => {
-            if (!speaker) {
-                return '';
-            }
+            if (!speaker) return '';
             const s = speaker.trim();
             if (s.includes('الكاهن')) {
                 return 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-800';
@@ -235,9 +215,32 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
 
         const hasText = (obj: Line | null | undefined) => obj && obj.text && obj.text.trim().length > 0;
 
-        if (!hasCoptic) {
+        const renderSpeakerBar = (currentSpeaker: string, compact: boolean) => (
+            <div className={cn('flex w-full items-center', compact ? 'gap-2 my-1' : 'gap-2 my-1.5')}>
+                <div className="h-px flex-1 bg-gradient-to-l from-transparent to-muted-foreground/30" />
+                <span
+                    className={cn(
+                        compact
+                            ? 'pres-speaker-badge px-4 py-1 rounded-full font-bold border shadow-sm'
+                            : 'pres-speaker-badge-lg px-5 py-1.5 rounded-xl font-black border shadow-sm transition-all',
+                        getSpeakerStyles(currentSpeaker)
+                    )}
+                >
+                    {currentSpeaker}
+                </span>
+                <div className="h-px flex-1 bg-gradient-to-r from-transparent to-muted-foreground/30" />
+            </div>
+        );
+
+        if (columnMode === 'single') {
             return (
-                <div className={cn('flex flex-col gap-6 max-w-5xl mx-auto w-full px-4 min-h-0 overflow-hidden', className)}>
+                <div
+                    ref={measureRootRef}
+                    className={cn(
+                        'flex h-full min-h-0 min-w-0 flex-1 flex-col items-stretch justify-start space-y-3 px-1 md:px-2',
+                        className
+                    )}
+                >
                     {currentLines.map((line, index) => {
                         const prevSpeaker = index > 0 ? currentLines[index - 1].speaker : null;
                         const shouldShowSpeaker = line.speaker && line.speaker !== prevSpeaker;
@@ -245,26 +248,13 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
                         return (
                             <div
                                 key={`${currentPage}-${line.id}-${index}`}
-                                className="flex flex-col gap-4 animate-in fade-in slide-in-from-bottom-2 duration-500"
+                                className="animate-in fade-in slide-in-from-bottom-2 flex flex-col space-y-2 duration-500"
                             >
-                                {shouldShowSpeaker && (
-                                    <div className="flex items-center gap-4 my-4">
-                                        <div className="h-[1px] flex-1 bg-gradient-to-l from-transparent to-border" />
-                                        <span
-                                            className={cn(
-                                                'pres-speaker-badge px-5 py-1.5 rounded-full font-bold border shadow-sm',
-                                                getSpeakerStyles(line.speaker)
-                                            )}
-                                        >
-                                            {line.speaker}
-                                        </span>
-                                        <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent to-border" />
-                                    </div>
-                                )}
+                                {shouldShowSpeaker && line.speaker && renderSpeakerBar(line.speaker, true)}
                                 <p
                                     className={cn(
-                                        'pres-slide-body-text leading-[1.8] font-reading font-bold text-foreground',
-                                        justified ? 'text-justified' : 'text-center'
+                                        bodyParagraphClassNames(justified, 'text-foreground'),
+                                        line.lang_type === 'arabic' && '!text-center' // توسيط العربي
                                     )}
                                     dir="rtl"
                                     dangerouslySetInnerHTML={lineHtml(line, highlightQuery)}
@@ -286,8 +276,16 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
             pairedLines.push([arabicLines[i] || null, arcopticLines[i] || null, copticLines[i] || null]);
         }
 
+        const isTriple = columnMode === 'triple';
+
         return (
-            <div className={cn('flex flex-col w-full max-w-7xl mx-auto gap-8 px-4 min-h-0 overflow-hidden', className)}>
+            <div
+                ref={measureRootRef}
+                className={cn(
+                    'flex h-full min-h-0 min-w-0 flex-1 flex-col items-stretch justify-start space-y-3 px-1 md:px-2',
+                    className
+                )}
+            >
                 {pairedLines.map(([ar, arcop, cop], index) => {
                     const showAr = hasText(ar);
                     const showArcop = hasText(arcop);
@@ -297,7 +295,9 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
 
                     const previousLine = index > 0 ? pairedLines[index - 1] : null;
                     const previousSpeaker = previousLine
-                        ? previousLine[0]?.speaker || previousLine[1]?.speaker || previousLine[2]?.speaker
+                        ? previousLine[0]?.speaker ||
+                          previousLine[1]?.speaker ||
+                          previousLine[2]?.speaker
                         : null;
 
                     const shouldShowSpeaker = currentSpeaker && currentSpeaker !== previousSpeaker;
@@ -306,34 +306,33 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
                         return null;
                     }
 
+                    const useThreeColLayout = isTriple && showCop;
+
                     return (
                         <div
                             key={`p${currentPage}-row-${index}`}
-                            className="flex flex-col gap-6"
+                            className="flex flex-col space-y-2"
                             style={{ animationDelay: `${index * 0.05}s` }}
                         >
-                            {shouldShowSpeaker && (
-                                <div className="flex items-center gap-4 w-full">
-                                    <div className="h-px flex-1 bg-gradient-to-l from-transparent to-muted-foreground/30" />
-                                    <span
+                            {shouldShowSpeaker && currentSpeaker && renderSpeakerBar(currentSpeaker, false)}
+
+                            <div
+                                className={cn(
+                                    'flex w-full flex-col items-stretch md:flex-row md:items-stretch',
+                                    rowGapClass
+                                )}
+                            >
+                                {showAr && ar && (
+                                    <div
                                         className={cn(
-                                            'pres-speaker-badge-lg px-8 py-2 rounded-xl font-black border shadow-sm transition-all hover:scale-105',
-                                            getSpeakerStyles(currentSpeaker)
+                                            'min-w-0 shrink-0 basis-full',
+                                            useThreeColLayout ? 'md:basis-[30%]' : 'md:basis-[40%]'
                                         )}
                                     >
-                                        {currentSpeaker}
-                                    </span>
-                                    <div className="h-px flex-1 bg-gradient-to-r from-transparent to-muted-foreground/30" />
-                                </div>
-                            )}
-
-                            <div className="flex flex-col md:flex-row gap-6 md:gap-10 items-start md:items-stretch">
-                                {showAr && ar && (
-                                    <div className="flex-1 w-full">
                                         <p
                                             className={cn(
-                                                'pres-slide-body-text leading-[1.6] text-foreground font-reading font-bold drop-shadow-sm',
-                                                justified ? 'text-justified' : 'text-right'
+                                                bodyParagraphClassNames(justified, 'text-foreground'),
+                                                '!text-center' // ⬅️ التوسيط الإجباري للنص العربي
                                             )}
                                             dir="rtl"
                                             dangerouslySetInnerHTML={lineHtml(ar, highlightQuery)}
@@ -341,32 +340,42 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
                                     </div>
                                 )}
 
-                                {showAr && (showArcop || showCop) && (
-                                    <div className="hidden md:block column-divider" aria-hidden="true" />
+                                {showAr && (showArcop || (useThreeColLayout && showCop)) && (
+                                    // ⬅️ تم وضع الخط الفاصل بدلاً من الديف المخفي
+                                    <div className="hidden md:block w-[1px] bg-black dark:bg-slate-200 shrink-0" aria-hidden="true" />
                                 )}
 
                                 {showArcop && arcop && (
-                                    <div className="flex-1 w-full">
+                                    <div
+                                        className={cn(
+                                            'min-w-0 shrink-0 basis-full',
+                                            useThreeColLayout ? 'md:basis-[35%]' : 'md:basis-[60%]'
+                                        )}
+                                    >
                                         <p
-                                            className={cn(
-                                                'pres-slide-body-text leading-[1.6] font-reading font-bold',
-                                                '!text-[#880808] dark:!text-sky-400',
-                                                justified ? 'text-justified' : 'text-right'
-                                            )}
+                                            className={bodyParagraphClassNames(
+                                            justified,
+                                                // أضفنا px-6 لعمل مسافة آمنة من الجوانب (Padding)
+                                                // وأضفنا leading-relaxed لتحسين توزيع الأسطر مع الـ justify
+                                                '!text-[#880808] dark:!text-sky-400 !text-center px-6 sm:px-8 break-words'                                            )}
                                             dir="rtl"
                                             dangerouslySetInnerHTML={lineHtml(arcop, highlightQuery)}
                                         />
                                     </div>
                                 )}
 
-                                {(showAr || showArcop) && showCop && (
-                                    <div className="hidden md:block column-divider" aria-hidden="true" />
+                                {useThreeColLayout && (showAr || showArcop) && showCop && (
+                                    // ⬅️ تم وضع الخط الفاصل بدلاً من الديف المخفي
+                                    <div className="hidden md:block w-[1px] bg-slate-200 dark:bg-slate-700 shrink-0" aria-hidden="true" />
                                 )}
 
-                                {showCop && cop && (
-                                    <div className="flex-1 w-full">
+                                {useThreeColLayout && showCop && cop && (
+                                    <div className="min-w-0 shrink-0 basis-full md:basis-[35%]">
                                         <p
-                                            className="pres-slide-body-text leading-[1.6] text-foreground font-reading font-bold"
+                                            className={cn(
+                                                bodyParagraphClassNames(justified, 'text-foreground', false),
+                                                'text-left'
+                                            )}
                                             dir="ltr"
                                             dangerouslySetInnerHTML={lineHtml(cop, highlightQuery)}
                                         />
@@ -378,6 +387,7 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
                 })}
             </div>
         );
-});
+    }
+);
 
 SplitViewReader.displayName = 'SplitViewReader';

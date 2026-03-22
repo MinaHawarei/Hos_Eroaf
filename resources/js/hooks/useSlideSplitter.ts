@@ -1,5 +1,11 @@
 import { useState, useEffect } from 'react';
 import { TextPaginator } from '@/utils/TextPaginator';
+import { computeSlidePages } from '@/utils/computeSlidePages';
+import {
+    linesHaveCopticScript,
+    paginationTolerancePx,
+    resolveMultiColumnMode,
+} from '@/utils/presentationLayout';
 
 interface OriginalSlide {
     id: string;
@@ -26,105 +32,50 @@ export function useSlideSplitter(slides: OriginalSlide[], baseFontSize: number =
             return;
         }
 
-        const maxHeight = window.innerHeight * 0.85;
-        const paginator = new TextPaginator('slide-content-enter', baseFontSize);
+        const budget = Math.round(window.innerHeight * 0.85);
+        const tolerance = paginationTolerancePx(budget);
+        const width = Math.max(280, window.innerWidth - 64);
+        const paginator = new TextPaginator('slide-content-enter', baseFontSize, width);
+        paginator.setContentWidth(width);
+
+        const measureAdapter = {
+            arabicParagraph: (t: string) => paginator.measureArabicParagraphHeight(t),
+            dualRow: (ar: string, copAr: string) => paginator.measureDualColumnRowHeight(ar, copAr),
+            tripleRow: (ar: string, copAr: string, cop: string) =>
+                paginator.measureTripleColumnRowHeight(ar, copAr, cop),
+        };
 
         const result: SplitSlide[] = [];
 
         slides.forEach((slide, originalIndex) => {
-            const { lines, has_coptic: hasCoptic } = slide;
+            const { lines, has_coptic: hasCopticArabized } = slide;
+            const mode = resolveMultiColumnMode(
+                Boolean(hasCopticArabized),
+                linesHaveCopticScript(lines)
+            );
 
-            if (hasCoptic) {
-                const arabicLines = lines.filter((l: any) => l.lang_type === 'arabic');
-                const copticLines = lines.filter((l: any) => l.lang_type === 'coptic_arabized');
-                const pureCopticLines = lines.filter((l: any) => l.lang_type === 'coptic');
+            const pages = computeSlidePages(
+                lines,
+                mode,
+                budget,
+                tolerance,
+                baseFontSize,
+                measureAdapter,
+                (text, maxH) => paginator.paginate(text, maxH)
+            );
 
-                const pairCount = Math.max(arabicLines.length, copticLines.length, pureCopticLines.length);
+            const finalPages = pages.length > 0 ? pages : [lines];
 
-                let currentPagePairs: any[] = [];
-                let currentHeight = 0;
-                const pages: any[][] = [];
-
-                for (let i = 0; i < pairCount; i++) {
-                    const ar = arabicLines[i]?.text || '';
-                    const copAr = copticLines[i]?.text || '';
-                    const cop = pureCopticLines[i]?.text || '';
-
-                    const h = paginator.measureTripleColumnRowHeight(ar, copAr, cop);
-
-                    if (currentHeight + h > maxHeight && currentPagePairs.length > 0) {
-                        pages.push(currentPagePairs);
-                        currentPagePairs = [];
-                        currentHeight = 0;
-                    }
-
-                    currentPagePairs.push({ ar: arabicLines[i], copAr: copticLines[i], cop: pureCopticLines[i] });
-                    currentHeight += h;
-                }
-
-                if (currentPagePairs.length > 0) {
-                    pages.push(currentPagePairs);
-                }
-
-                pages.forEach((pagePairs, pIdx) => {
-                    const pageLines = pagePairs.flatMap((p: any) => [p.ar, p.copAr, p.cop].filter(Boolean));
-                    result.push({
-                        ...slide,
-                        id: `${slide.id}-p${pIdx}`,
-                        lines: pageLines,
-                        pageIndex: pIdx,
-                        totalPages: pages.length,
-                        originalIndex,
-                    });
+            finalPages.forEach((pageLines, pIdx) => {
+                result.push({
+                    ...slide,
+                    id: `${slide.id}-p${pIdx}`,
+                    lines: pageLines,
+                    pageIndex: pIdx,
+                    totalPages: finalPages.length,
+                    originalIndex,
                 });
-            } else {
-                const pages: any[][] = [];
-                let currentPageLines: any[] = [];
-                let currentHeight = 0;
-
-                for (let i = 0; i < lines.length; i++) {
-                    const line = lines[i];
-                    const h = paginator.measureArabicParagraphHeight(line.text);
-
-                    if (h > maxHeight) {
-                        if (currentPageLines.length > 0) {
-                            pages.push(currentPageLines);
-                            currentPageLines = [];
-                            currentHeight = 0;
-                        }
-
-                        const textChunks = paginator.paginate(line.text, maxHeight);
-                        textChunks.forEach((chunk) => {
-                            pages.push([{ ...line, text: chunk }]);
-                        });
-                        continue;
-                    }
-
-                    if (currentHeight + h > maxHeight && currentPageLines.length > 0) {
-                        pages.push(currentPageLines);
-                        currentPageLines = [];
-                        currentHeight = 0;
-                    }
-
-                    currentPageLines.push(line);
-                    currentHeight += h;
-                }
-
-                if (currentPageLines.length > 0) {
-                    pages.push(currentPageLines);
-                }
-
-                pages.forEach((pageLines, pIdx) => {
-                    result.push({
-                        ...slide,
-                        id: `${slide.id}-p${pIdx}`,
-                        lines: pageLines,
-                        pageIndex: pIdx,
-                        totalPages: pages.length,
-                        originalIndex,
-                    });
-                });
-            }
+            });
         });
 
         paginator.cleanup();
