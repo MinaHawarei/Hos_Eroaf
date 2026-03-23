@@ -35,6 +35,7 @@ export interface SplitViewReaderProps {
     maxContentHeight: number;
     fontSizePx: number;
     highlightQuery?: string;
+    initialPage?: number; // أضف هذا السطر
     onPaginationMetaChange?: (meta: {
         isFirstPage: boolean;
         isLastPage: boolean;
@@ -48,6 +49,10 @@ export interface SplitViewReaderRef {
     prevPage: () => boolean;
     isFirstPage: boolean;
     isLastPage: boolean;
+    currentPageIndex: number;
+    totalPages: number;
+    canGoToNextSlide: boolean;
+    canGoToPrevSlide: boolean;
 }
 
 function lineHtml(line: Line, highlightQuery: string | undefined): { __html: string } {
@@ -89,11 +94,12 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
             maxContentHeight,
             fontSizePx,
             highlightQuery,
+            initialPage = 0,
             onPaginationMetaChange,
         },
         ref
     ) => {
-        const [currentPage, setCurrentPage] = useState(0);
+        const [currentPage, setCurrentPage] = useState(initialPage);
         const [pages, setPages] = useState<Line[][]>([lines]);
         const measureRootRef = useRef<HTMLDivElement>(null);
         const [contentWidthPx, setContentWidthPx] = useState(0);
@@ -132,6 +138,12 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
             },
             [onPaginationMetaChange]
         );
+
+        useEffect(() => {
+            if (initialPage !== undefined && initialPage !== currentPage) {
+                setCurrentPage(initialPage);
+            }
+        }, [initialPage]);
 
         useEffect(() => {
             setCurrentPage(0);
@@ -177,6 +189,7 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
             emitMeta(currentPage, pages);
         }, [currentPage, pages, emitMeta]);
 
+
         useImperativeHandle(
             ref,
             () => ({
@@ -196,6 +209,10 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
                 },
                 isFirstPage: currentPage === 0,
                 isLastPage: pages.length === 0 || currentPage === pages.length - 1,
+                currentPageIndex: currentPage,
+                totalPages: pages.length,
+                canGoToNextSlide: pages.length > 0 && currentPage === pages.length - 1,
+                canGoToPrevSlide: currentPage === 0,
             }),
             [currentPage, pages.length]
         );

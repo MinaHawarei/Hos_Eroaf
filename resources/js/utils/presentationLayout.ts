@@ -9,8 +9,12 @@ export const PRES_ROW_BLOCK_STACK_GAP_PX = 12;
 
 export type MultiColumnMode = 'single' | 'dual' | 'triple';
 
+/**
+ * المسافة الإضافية لعرض المتحدث - تم تقليلها لاستغلال المساحة بشكل أفضل
+ */
 export function speakerBlockExtraPx(fontSizePx: number): number {
-    return Math.round(Math.min(48, Math.max(26, fontSizePx * 1.12)));
+    // تم التخفيض من fontSizePx * 1.12 إلى fontSizePx * 0.85
+    return Math.round(Math.min(40, Math.max(20, fontSizePx * 0.85)));
 }
 
 /** Upper bound for “still fits on this page” — budget plus flexible tolerance. */
@@ -20,18 +24,22 @@ export function paginationOverflowCeiling(budgetPx: number, tolerancePx: number)
 
 /**
  * Extra height allowed when packing lines so we do not break pages early.
- * Scales with viewport/font changes (budget is the measured slot height).
+ * تم تقليل التسامح لاستغلال المساحة بشكل أفضل
  */
 export function paginationTolerancePx(budgetPx: number): number {
-    return Math.min(88, Math.max(28, Math.round(budgetPx * 0.14)));
+    // تم التخفيض من budgetPx * 0.14 إلى budgetPx * 0.08
+    // مع حد أدنى 16 وأقصى 56
+    return Math.min(56, Math.max(16, Math.round(budgetPx * 0.08)));
 }
 
 /**
  * Reserve height from the measured slot so pagination stays inside the viewport
  * (line-height rounding, flex gaps, and safe padding).
+ * تم تقليل الاحتياطي بشكل كبير لاستغلال المساحة
  */
 export function paginationVerticalReservePx(fontSizePx: number): number {
-    return Math.max(10, Math.ceil(fontSizePx * 0.42) + 6);
+    // تم التخفيض من fontSizePx * 0.42 + 6 إلى fontSizePx * 0.25 + 4
+    return Math.max(8, Math.ceil(fontSizePx * 0.25) + 4);
 }
 
 export function linesHaveCopticScript(

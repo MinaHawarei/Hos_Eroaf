@@ -10,7 +10,7 @@ function escapeHtml(s: string): string {
 }
 
 /** Matches SplitViewReader horizontal padding (`px-8` / `px-10`). */
-const SANDBOX_PAD_X = '2.5rem';
+const SANDBOX_PAD_X = '1.5rem';
 
 const P_RTL = `pres-slide-body-text ${PRES_BODY_LEADING_CLASS} text-foreground font-reading font-bold break-words text-justify pres-arabic-justify`;
 const P_COP_AR = `pres-slide-body-text ${PRES_BODY_LEADING_CLASS} font-reading font-bold break-words text-justify pres-arabic-justify !text-[#880808] dark:!text-sky-400`;

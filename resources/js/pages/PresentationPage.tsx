@@ -6,6 +6,8 @@ import { SplitViewReader, SplitViewReaderRef } from '@/components/SplitViewReade
 import { PresentationSidebar } from '@/components/PresentationSidebar';
 import { SearchOverlay } from '@/components/SearchOverlay';
 import { Button } from '@/components/ui/button';
+import { splitLargeSlides, SplitResult } from '@/utils/splitLargeSlides';
+import { TextPaginator } from '@/utils/TextPaginator';
 import {
     Search,
     Maximize,
@@ -19,6 +21,7 @@ import {
     Plus,
     Minus,
     RotateCcw,
+    Loader2,
 } from 'lucide-react';
 import Cookies from 'js-cookie';
 
@@ -65,11 +68,13 @@ export default function PresentationPage({
     slides: slidesProp,
     defaultBaseFontSize = 28,
 }: PresentationPageProps) {
-    const [deck, setDeck] = useState<Slide[]>(slidesProp ?? []);
+    const [deck, setDeck] = useState<Slide[]>([]);
     const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [searchOpen, setSearchOpen] = useState(false);
     const [highlightQuery, setHighlightQuery] = useState<string | undefined>(undefined);
+    const [isSplitting, setIsSplitting] = useState(true);
+    const [splitInfo, setSplitInfo] = useState<SplitResult | null>(null);
 
     const [baseFontSize] = useState(() => {
         const fromCookie = Number(Cookies.get('baseFontSize'));
@@ -92,10 +97,78 @@ export default function PresentationPage({
 
     const effectiveFontSize = Math.round(baseFontSize * zoomScale);
 
+    // دالة معالجة وتقسيم الشرائح
+    const processAndSplitSlides = useCallback(async () => {
+        if (!slidesProp || slidesProp.length === 0) {
+            setDeck([]);
+            setIsSplitting(false);
+            return;
+        }
+
+        setIsSplitting(true);
+
+        try {
+            // إنشاء TextPaginator للقياسات الدقيقة
+            const containerWidth = typeof window !== 'undefined'
+                ? Math.max(280, window.innerWidth - 64)
+                : 960;
+
+            const paginator = new TextPaginator(
+                'slide-content-enter',
+                effectiveFontSize,
+                containerWidth
+            );
+            paginator.setContentWidth(containerWidth);
+
+            const measureAdapter = {
+                arabicParagraph: (t: string) => paginator.measureArabicParagraphHeight(t),
+                dualRow: (ar: string, copAr: string) => paginator.measureDualColumnRowHeight(ar, copAr),
+                tripleRow: (ar: string, copAr: string, cop: string) =>
+                    paginator.measureTripleColumnRowHeight(ar, copAr, cop),
+            };
+
+            // استخدام ارتفاع الـ container الفعلي أو قيمة افتراضية
+            const availableHeight = Math.max(300, readerSlotHeight);
+
+            // تقسيم الشرائح الكبيرة
+            const result = await splitLargeSlides(
+                slidesProp,
+                availableHeight,
+                effectiveFontSize,
+                containerWidth,
+                measureAdapter
+            );
+
+            setDeck(result.slides);
+            setSplitInfo(result);
+
+            // تنظيف الـ paginator
+            paginator.cleanup();
+
+            // تسجيل معلومات التقسيم في الكونسول للتطوير
+            if (result.totalSplitSlides > result.totalOriginalSlides) {
+                console.log(
+                    `تم تقسيم الشرائح: ${result.totalOriginalSlides} → ${result.totalSplitSlides} شريحة ` +
+                    `(+${result.totalSplitSlides - result.totalOriginalSlides} شريحة جديدة)`
+                );
+            }
+        } catch (error) {
+            console.error('خطأ في تقسيم الشرائح:', error);
+            // في حالة الخطأ، استخدم الشرائح الأصلية
+            setDeck(slidesProp);
+        } finally {
+            setIsSplitting(false);
+        }
+    }, [slidesProp, effectiveFontSize, readerSlotHeight]);
+
+    // تأثير لتقسيم الشرائح عند تغيير البيانات أو حجم الخط أو ارتفاع الحاوية
     useEffect(() => {
-        setDeck(slidesProp ?? []);
+        processAndSplitSlides();
+    }, [processAndSplitSlides]);
+
+    useEffect(() => {
         setCurrentSlideIndex(0);
-    }, [slidesProp]);
+    }, [deck]);
 
     useEffect(() => {
         sessionStorage.setItem(ZOOM_STORAGE_KEY, String(zoomScale));
@@ -199,6 +272,20 @@ export default function PresentationPage({
         window.addEventListener('keydown', h);
         return () => window.removeEventListener('keydown', h);
     }, [toggleFullscreen]);
+
+    // شاشة التحميل أثناء تقسيم الشرائح
+    if (isSplitting) {
+        return (
+            <div className="presentation-bg flex h-screen items-center justify-center p-8" dir="rtl">
+                <Head title="جاري التحميل..." />
+                <div className="text-center heritage-surface rounded-2xl p-12 max-w-md">
+                    <Loader2 className="h-16 w-16 text-primary/30 mx-auto mb-6 animate-spin" />
+                    <h1 className="text-2xl font-serif font-bold mb-4 text-foreground">جاري تجهيز العرض</h1>
+                    <p className="text-muted-foreground">يتم تقسيم الشرائح الكبيرة لتحسين العرض...</p>
+                </div>
+            </div>
+        );
+    }
 
     if (!deck || deck.length === 0) {
         return (
@@ -341,9 +428,9 @@ export default function PresentationPage({
 
             <main
                 ref={mainRef}
-                className="flex min-h-0 flex-1 flex-col items-stretch justify-start overflow-hidden px-8 pt-4 md:px-10 md:pt-5"
+                className="flex min-h-0 flex-1 flex-col items-stretch justify-center overflow-hidden px-8 pt-4 md:px-10 md:pt-5"
             >
-                <div className="pres-slide-column flex min-h-0 w-full max-w-none flex-1 flex-col">
+                <div className="pres-slide-column flex min-h-0 w-full max-w-none flex-1 flex-col justify-center">
                     <div className="flex w-full flex-shrink-0 flex-col items-center">
                         <div className="slide-section-header pres-section-header-scale mb-3 text-center md:mb-4">
                             <span className="ornament" aria-hidden="true" />
@@ -358,11 +445,12 @@ export default function PresentationPage({
                         <div className="ornamental-rule mb-3 md:mb-4">
                             <span className="ornament-diamond" />
                         </div>
+
                     </div>
 
                     <div
                         ref={readerSlotRef}
-                        className="flex min-h-0 w-full flex-1 flex-col justify-start overflow-hidden"
+                        className="flex min-h-0 w-full flex-1 flex-col justify-center overflow-hidden"
                     >
                         <SplitViewReader
                             key={currentSlide.id}
@@ -370,7 +458,7 @@ export default function PresentationPage({
                             lines={currentSlide.lines}
                             hasCoptic={currentSlide.has_coptic}
                             justified={true}
-                            className="flex min-h-0 w-full min-w-0 flex-1 flex-col"
+                            className="flex min-h-0 w-full min-w-0 flex-1 flex-col justify-cente"
                             maxContentHeight={readerSlotHeight}
                             fontSizePx={effectiveFontSize}
                             highlightQuery={highlightQuery}
@@ -443,8 +531,6 @@ export default function PresentationPage({
                     <RotateCcw className="h-5 w-5" />
                 </Button>
             </div>
-
-
         </div>
     );
 }

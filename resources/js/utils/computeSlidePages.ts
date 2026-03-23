@@ -90,61 +90,108 @@ function paginateSingleColumn(
     const pages: PaginatableLine[][] = [];
     let chunk: PaginatableLine[] = [];
     let height = 0;
+    let i = 0;
 
-    for (let i = 0; i < lines.length; i++) {
+    while (i < lines.length) {
         const line = lines[i];
-        const prev = lines[i - 1];
+        const prevLine = i > 0 ? lines[i - 1] : null;
         const speakerChanged = Boolean(
-            line.speaker && line.speaker !== prev?.speaker && i > 0
+            line.speaker && line.speaker !== prevLine?.speaker && i > 0
         );
-        const block = measure.arabicParagraph(line.text) + (speakerChanged ? speakerExtra : 0);
+
+        // حساب ارتفاع السطر مع مراعاة تغيير المتحدث
+        const lineHeight = measure.arabicParagraph(line.text) + (speakerChanged ? speakerExtra : 0);
         const stackGap = chunk.length > 0 ? PRES_ROW_BLOCK_STACK_GAP_PX : 0;
 
-        if (block > budgetPx) {
+        // حالة 1: السطر طويل جداً ويحتاج للتقسيم
+        if (lineHeight > budgetPx) {
+            // إذا كان هناك محتوى في الـ chunk الحالي، احفظه أولاً
             if (chunk.length > 0) {
-                pages.push(chunk);
+                pages.push([...chunk]);
                 chunk = [];
                 height = 0;
             }
+
+            // تقسيم النص الطويل إلى أجزاء
             const parts = splitLongParagraph(line.text, budgetPx);
-            parts.forEach((t) => {
-                pages.push([{ ...line, text: t }]);
-            });
+
+            // معالجة كل جزء على حدة
+            for (let partIdx = 0; partIdx < parts.length; partIdx++) {
+                const part = parts[partIdx];
+                const partLine = { ...line, text: part };
+
+                // حساب ارتفاع الجزء (بدون speaker extra لأننا نتعامل مع نفس المتحدث)
+                const partHeight = measure.arabicParagraph(part);
+
+                // إذا كان هذا هو الجزء الأول والمتحدث مختلف، أضف الـ speaker extra
+                const finalPartHeight = (partIdx === 0 && speakerChanged)
+                    ? partHeight + speakerExtra
+                    : partHeight;
+
+                // التحقق إذا كان الجزء ينتهي في منتصف الصفحة أو يحتاج صفحة جديدة
+                if (height + stackGap + finalPartHeight <= ceiling) {
+                    // يمكن إضافة الجزء إلى الـ chunk الحالي
+                    if (chunk.length === 0 && partIdx === 0) {
+                        // أول جزء، أضفه مع المتحدث إذا لزم
+                        chunk.push(partLine);
+                        height = finalPartHeight;
+                    } else if (chunk.length > 0) {
+                        // أضف الأجزاء التالية بدون تكرار المتحدث
+                        const strippedLine = { ...partLine, speaker: undefined };
+                        chunk.push(strippedLine);
+                        height += stackGap + partHeight;
+                    } else {
+                        // chunk فارغ، ابدأ صفحة جديدة
+                        const strippedLine = { ...partLine, speaker: undefined };
+                        chunk.push(strippedLine);
+                        height = partHeight;
+                    }
+                } else {
+                    // الجزء لا يتسع، احفظ الصفحة الحالية وابدأ صفحة جديدة
+                    if (chunk.length > 0) {
+                        pages.push([...chunk]);
+                        chunk = [];
+                        height = 0;
+                    }
+
+                    // أضف الجزء إلى صفحة جديدة
+                    const strippedLine = { ...partLine, speaker: undefined };
+                    chunk.push(strippedLine);
+                    height = partHeight;
+                }
+            }
+
+            i++;
             continue;
         }
 
-        if (height + stackGap + block > ceiling && chunk.length > 0) {
-            pages.push(chunk);
+        // حالة 2: السعر عادي، حاول إضافته إلى الصفحة الحالية
+        const totalWithGap = height + (chunk.length > 0 ? stackGap : 0) + lineHeight;
+
+        if (totalWithGap > ceiling && chunk.length > 0) {
+            // لا يتسع، احفظ الصفحة الحالية وابدأ صفحة جديدة
+            pages.push([...chunk]);
             chunk = [];
             height = 0;
-        }
 
-        chunk.push(line);
-        height += block + (chunk.length > 1 ? PRES_ROW_BLOCK_STACK_GAP_PX : 0);
-
-        let j = i + 1;
-        while (j < lines.length) {
-            const nextLine = lines[j];
-            const nextPrev = lines[j - 1];
-            const nextSpeakerChanged = Boolean(
-                nextLine.speaker && nextLine.speaker !== nextPrev?.speaker
-            );
-            const nextBlock =
-                measure.arabicParagraph(nextLine.text) +
-                (nextSpeakerChanged ? speakerExtra : 0);
-            const nextGap = PRES_ROW_BLOCK_STACK_GAP_PX;
-
-            if (height + nextGap + nextBlock <= ceiling) {
-                chunk.push(nextLine);
-                height += nextGap + nextBlock;
-                i = j;
-                j++;
+            // أضف السطر الحالي إلى الصفحة الجديدة
+            chunk.push(line);
+            height = lineHeight;
+        } else {
+            // يتسع، أضفه إلى الصفحة الحالية
+            if (chunk.length === 0) {
+                chunk.push(line);
+                height = lineHeight;
             } else {
-                break;
+                chunk.push(line);
+                height += stackGap + lineHeight;
             }
         }
+
+        i++;
     }
 
+    // أضف آخر صفحة إذا كان فيها محتوى
     if (chunk.length > 0) {
         pages.push(chunk);
     }
@@ -190,40 +237,31 @@ function paginateMultiColumn(
         return textH + (speakerChanged ? speakerExtra : 0);
     };
 
-    const segmentHeight = (
-        seg: MultiColumnRowSegment,
-        includeSpeaker: boolean,
-        speakerExtraPx: number
-    ): number => {
-        const arT = seg.ar;
-        const copArT = seg.copAr;
-        const copT = seg.cop;
-        const hasCopScript = copT.trim().length > 0;
-        const textH =
-            triple && hasCopScript
-                ? measure.tripleRow(arT, copArT, copT)
-                : measure.dualRow(arT, copArT);
-        return textH + (includeSpeaker ? speakerExtraPx : 0);
-    };
-
     const pages: PaginatableLine[][] = [];
     let chunk: PaginatableLine[] = [];
     let currentHeight = 0;
+    let i = 0;
 
-    for (let i = 0; i < maxLen; i++) {
+    while (i < maxLen) {
         const cost = rowHeight(i);
         const rowLines = linesForRow(i, arabicLines, arcopticLines, copticLines, triple);
 
         if (rowLines.length === 0) {
+            i++;
             continue;
         }
 
+        const gapBeforeRow = chunk.length > 0 ? PRES_ROW_BLOCK_STACK_GAP_PX : 0;
+        const totalWithGap = currentHeight + gapBeforeRow + cost;
+
+        // حالة الصف طويل جداً ويحتاج تقسيم
         if (cost > budgetPx) {
             if (chunk.length > 0) {
-                pages.push(chunk);
+                pages.push([...chunk]);
                 chunk = [];
                 currentHeight = 0;
             }
+
             const ar = arabicLines[i];
             const copAr = arcopticLines[i];
             const cop = copticLines[i];
@@ -262,56 +300,48 @@ function paginateMultiColumn(
                     segIdx++;
                     continue;
                 }
+
                 const includeSpeaker = segIdx === 0 && speakerChangedBase;
                 if (segIdx > 0) {
                     partial = stripSpeakers(partial);
                 }
-                const segCost = segmentHeight(seg, includeSpeaker, speakerExtra);
-                const stackGap = chunk.length > 0 ? PRES_ROW_BLOCK_STACK_GAP_PX : 0;
-                if (currentHeight + stackGap + segCost > ceiling && chunk.length > 0) {
-                    pages.push(chunk);
+
+                const segCost = measure.dualRow(seg.ar, seg.copAr) + (includeSpeaker ? speakerExtra : 0);
+                const gap = chunk.length > 0 ? PRES_ROW_BLOCK_STACK_GAP_PX : 0;
+
+                if (currentHeight + gap + segCost > ceiling && chunk.length > 0) {
+                    pages.push([...chunk]);
                     chunk = [];
                     currentHeight = 0;
                 }
+
+                const pushGap = chunk.length > 0 ? PRES_ROW_BLOCK_STACK_GAP_PX : 0;
                 chunk.push(...partial);
-                currentHeight += stackGap + segCost;
+                currentHeight += pushGap + segCost;
                 segIdx++;
             }
+
+            i++;
             continue;
         }
 
-        const gapBeforeRow = chunk.length > 0 ? PRES_ROW_BLOCK_STACK_GAP_PX : 0;
-        if (currentHeight + gapBeforeRow + cost > ceiling && chunk.length > 0) {
-            pages.push(chunk);
+        // حالة عادية
+        if (totalWithGap > ceiling && chunk.length > 0) {
+            pages.push([...chunk]);
             chunk = [];
             currentHeight = 0;
+
+            // أضف الصف الحالي إلى الصفحة الجديدة
+            chunk.push(...rowLines);
+            currentHeight = cost;
+        } else {
+            // أضف إلى الصفحة الحالية
+            const pushGap = chunk.length > 0 ? PRES_ROW_BLOCK_STACK_GAP_PX : 0;
+            chunk.push(...rowLines);
+            currentHeight += pushGap + cost;
         }
 
-        const stackBeforePush = chunk.length > 0 ? PRES_ROW_BLOCK_STACK_GAP_PX : 0;
-        chunk.push(...rowLines);
-        currentHeight += stackBeforePush + cost;
-
-        let j = i + 1;
-        while (j < maxLen) {
-            const nextLines = linesForRow(j, arabicLines, arcopticLines, copticLines, triple);
-            if (nextLines.length === 0) {
-                j++;
-                continue;
-            }
-            const nextCost = rowHeight(j);
-            if (nextCost > budgetPx) {
-                break;
-            }
-            const nextGap = PRES_ROW_BLOCK_STACK_GAP_PX;
-            if (currentHeight + nextGap + nextCost <= ceiling) {
-                chunk.push(...nextLines);
-                currentHeight += nextGap + nextCost;
-                i = j;
-                j++;
-            } else {
-                break;
-            }
-        }
+        i++;
     }
 
     if (chunk.length > 0) {
