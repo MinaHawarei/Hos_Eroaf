@@ -457,7 +457,7 @@ export default function PresentationPage({
                             ref={readerRef}
                             lines={currentSlide.lines}
                             hasCoptic={currentSlide.has_coptic}
-                            justified={false}
+                            justified={true}
                             className="flex min-h-0 w-full min-w-0 flex-1 flex-col justify-center"
                             maxContentHeight={readerSlotHeight}
                             fontSizePx={effectiveFontSize}

@@ -19,6 +19,7 @@ import {
     resolveMultiColumnMode,
     type MultiColumnMode,
 } from '@/utils/presentationLayout';
+import { applyKashida } from '@/utils/ArabicKashida';
 
 export interface Line {
     id: number;

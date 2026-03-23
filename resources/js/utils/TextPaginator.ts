@@ -4,6 +4,7 @@
 
 import type { MultiColumnRowSegment } from '@/utils/computeSlidePages';
 import { PRES_BODY_LEADING_CLASS } from '@/utils/presentationLayout';
+import { applyKashida } from '@/utils/ArabicKashida';
 
 function escapeHtml(s: string): string {
     return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');

@@ -472,17 +472,22 @@
     font-size: var(--pres-font-size, 28px);
 }
 
-/* Justified blocks: Tailwind `text-justify` + last-line alignment for RTL/LTR */
+/* Justified blocks: Enhanced for Arabic with inter-word justification and proper spacing */
 .pres-arabic-justify {
     text-align: justify;
+    text-justify: inter-word;
     text-align-last: start;
-    word-spacing: 0.04em;
+    word-spacing: -0.01em;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
 .pres-ltr-justify {
     text-align: justify;
+    text-justify: inter-word;
     text-align-last: start;
-    word-spacing: 0.04em;
+    word-spacing: 0.02em;
 }
 
 .pres-speaker-badge {

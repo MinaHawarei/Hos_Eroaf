@@ -17,9 +17,9 @@ export class SearchService {
 
         let normalized = str;
         
-        // Strip Tashkeel (Fatha, Damma, Kasra, Sukun, Shadda, Tanween, etc)
-        // Range \u064B to \u065F covers standard Arabic diacritics
-        normalized = normalized.replace(/[\u064B-\u065F\u0670]/g, '');
+        // Strip Tashkeel (diacritics) and Kashida (tatweel)
+        // \u0640 is Kashida, range \u064B to \u065F is diacritics
+        normalized = normalized.replace(/[\u0640\u064B-\u065F\u0670]/g, '');
 
         // Unify Alefs
         normalized = normalized.replace(/[أإآ]/g, 'ا');
@@ -30,7 +30,7 @@ export class SearchService {
         // Unify Alef Maksura to Yeh
         normalized = normalized.replace(/ى/g, 'ي');
 
-        return normalized.toLowerCase(); // Also lowercase for english fallbacks
+        return normalized.toLowerCase();
     }
 
     /**
@@ -79,8 +79,8 @@ export class SearchService {
             return escapeRegExp(char);
         });
 
-        // The join allows any sequence of diacritics between matching characters
-        const diacriticsRegex = '[\\u064B-\\u065F\\u0670]*';
+        // The join allows any sequence of diacritics/kashida between matching characters
+        const diacriticsRegex = '[\\u0640\\u064B-\\u065F\\u0670]*';
         const searchPattern = regexParts.join(diacriticsRegex) + diacriticsRegex;
 
         try {
