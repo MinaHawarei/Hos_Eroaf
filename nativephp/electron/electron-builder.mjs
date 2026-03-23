@@ -82,7 +82,14 @@ export default {
     },
     afterSign: 'build/notarize.js',
     win: {
+        target: [
+            {
+                target: 'nsis',
+                arch: ['x64']
+            }
+        ],
         executableName: fileName,
+
         ...(azurePublisherName && azureEndpoint && azureCertificateProfileName && azureCodeSigningAccountName ? {
             azureSignOptions: {
                 publisherName: azurePublisherName,
@@ -142,6 +149,10 @@ export default {
                 '**/*',
                 '!{.git}',
             ]
+        },
+        {
+            from: "../../content",
+            to: "content"
         }
     ],
     extraFiles: [
@@ -153,7 +164,7 @@ export default {
             ]
         }
     ],
-    ...updaterEnabled 
-        ? { publish: updaterConfig } 
+    ...updaterEnabled
+        ? { publish: updaterConfig }
         : {}
 };
