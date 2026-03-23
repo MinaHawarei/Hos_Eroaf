@@ -71,15 +71,8 @@ function bodyParagraphClassNames(
     isRtl: boolean = true
 ): string {
     return cn(
-        'pres-slide-body-text font-reading font-bold break-words',
+        'pres-slide-body-text font-reading font-bold break-words text-center',
         PRES_BODY_LEADING_CLASS,
-        justified
-            ? isRtl
-                ? 'text-justify pres-arabic-justify'
-                : 'text-justify pres-ltr-justify'
-            : isRtl
-              ? 'text-right'
-              : 'text-left',
         extra
     );
 }
@@ -236,29 +229,62 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
 
         const hasText = (obj: Line | null | undefined) => obj && obj.text && obj.text.trim().length > 0;
 
-        const renderSpeakerBar = (currentSpeaker: string, compact: boolean) => (
-            <div className={cn('flex w-full items-center', compact ? 'gap-2 my-1' : 'gap-2 my-1.5')}>
-                <div className="h-px flex-1 bg-gradient-to-l from-transparent to-muted-foreground/30" />
-                <span
-                    className={cn(
-                        compact
-                            ? 'pres-speaker-badge px-4 py-1 rounded-full font-bold border shadow-sm'
-                            : 'pres-speaker-badge-lg px-5 py-1.5 rounded-xl font-black border shadow-sm transition-all',
-                        getSpeakerStyles(currentSpeaker)
-                    )}
-                >
-                    {currentSpeaker}
-                </span>
-                <div className="h-px flex-1 bg-gradient-to-r from-transparent to-muted-foreground/30" />
-            </div>
-        );
+        const renderSpeakerBar = (currentSpeaker: string, compact: boolean) => {
+            const isDual = columnMode === 'dual';
+
+            // Unified badge styling for all modes
+            const badgeClasses = cn(
+                'pres-speaker-badge-lg px-5 py-1.5 rounded-xl font-black border shadow-sm transition-all',
+                getSpeakerStyles(currentSpeaker)
+            );
+
+            if (isDual) {
+                return (
+                    <div
+                        className={cn(
+                            'flex w-full items-center',
+                            compact ? 'my-1' : 'my-1.5 mr-4',
+                            'gap-3 md:gap-4'
+                        )}
+                    >
+                        {/* Right side line - matches Arabic column (40%) */}
+                        <div className="hidden md:flex md:basis-[40%] items-center">
+                        </div>
+
+                        {/* Middle Badge - positioned at the divider for dual mode */}
+                        <div className="w-full md:w-px md:flex-none flex items-center justify-center overflow-visible">
+                            <div className="h-px flex-1 bg-gradient-to-l from-transparent to-muted-foreground/30 md:hidden" />
+                            <span className={badgeClasses}>
+                                {currentSpeaker}
+                            </span>
+                            <div className="h-px flex-1 bg-gradient-to-r from-transparent to-muted-foreground/30 md:hidden" />
+                        </div>
+
+                        {/* Left side line - matches Coptic column (60%) */}
+                        <div className="hidden md:flex md:basis-[60%] items-center">
+                        </div>
+                    </div>
+                );
+            }
+
+            // Default behavior for Single and Triple column modes (centered)
+            return (
+                <div className={cn('flex w-full items-center', compact ? 'gap-2 my-1' : 'gap-2 my-1.5')}>
+                    <div className="h-px flex-1 bg-gradient-to-l from-transparent to-muted-foreground/30" />
+                    <span className={badgeClasses}>
+                        {currentSpeaker}
+                    </span>
+                    <div className="h-px flex-1 bg-gradient-to-r from-transparent to-muted-foreground/30" />
+                </div>
+            );
+        };
 
         if (columnMode === 'single') {
             return (
                 <div
                     ref={measureRootRef}
                     className={cn(
-                        'flex h-full min-h-0 min-w-0 flex-1 flex-col items-stretch justify-start space-y-3 px-8 md:px-10',
+                        'flex h-full min-h-0 min-w-0 flex-1 flex-col items-stretch justify-center space-y-3 px-8 md:px-10',
                         className
                     )}
                 >
@@ -300,7 +326,7 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
             <div
                 ref={measureRootRef}
                 className={cn(
-                    'flex h-full min-h-0 min-w-0 flex-1 flex-col items-stretch justify-start space-y-3 px-8 md:px-10',
+                    'flex h-full min-h-0 min-w-0 flex-1 flex-col items-stretch justify-center space-y-3 px-8 md:px-10',
                     className
                 )}
             >

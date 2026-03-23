@@ -428,9 +428,9 @@ export default function PresentationPage({
 
             <main
                 ref={mainRef}
-                className="flex min-h-0 flex-1 flex-col items-stretch justify-center overflow-hidden px-8 pt-4 md:px-10 md:pt-5"
+                className="flex min-h-0 flex-1 flex-col items-stretch justify-start overflow-hidden px-8 pt-4 md:px-10 md:pt-5"
             >
-                <div className="pres-slide-column flex min-h-0 w-full max-w-none flex-1 flex-col justify-center">
+                <div className="pres-slide-column flex min-h-0 w-full max-w-none flex-1 flex-col justify-start">
                     <div className="flex w-full flex-shrink-0 flex-col items-center">
                         <div className="slide-section-header pres-section-header-scale mb-3 text-center md:mb-4">
                             <span className="ornament" aria-hidden="true" />
@@ -457,8 +457,8 @@ export default function PresentationPage({
                             ref={readerRef}
                             lines={currentSlide.lines}
                             hasCoptic={currentSlide.has_coptic}
-                            justified={true}
-                            className="flex min-h-0 w-full min-w-0 flex-1 flex-col justify-cente"
+                            justified={false}
+                            className="flex min-h-0 w-full min-w-0 flex-1 flex-col justify-center"
                             maxContentHeight={readerSlotHeight}
                             fontSizePx={effectiveFontSize}
                             highlightQuery={highlightQuery}
