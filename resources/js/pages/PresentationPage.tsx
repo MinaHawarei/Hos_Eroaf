@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useLayoutEffect, useRef } from 'react';
 import { Head, router } from '@inertiajs/react';
 import { usePresentationNavigation } from '@/hooks/usePresentationNavigation';
-import { useExternalPresentation } from '@/hooks/useExternalPresentation';
+import { useSync } from '@/hooks/useSync';
 import { SplitViewReader, SplitViewReaderRef } from '@/components/SplitViewReader';
 import { PresentationSidebar } from '@/components/PresentationSidebar';
 import { SearchOverlay } from '@/components/SearchOverlay';
@@ -101,6 +101,8 @@ export default function PresentationPage({
     const [readerNav, setReaderNav] = useState({
         isFirstPage: true,
         isLastPage: true,
+        pageIndex: 0,
+        pageCount: 1,
     });
 
     const effectiveFontSize = Math.round(baseFontSize * zoomScale);
@@ -244,27 +246,29 @@ export default function PresentationPage({
         handlePrevSlide
     );
 
-    const { broadcastSlide, openExternalWindow, closeAllExternal, externalCount, hasExternalWindows } =
-        useExternalPresentation();
+    const { broadcast, openMirrorWindow, closeMirrors, mirrorCount, hasMirrors } =
+        useSync('source');
 
     const currentSlide = deck?.[currentSlideIndex];
 
     useEffect(() => {
         setHighlightQuery(undefined);
-        setReaderNav({ isFirstPage: true, isLastPage: true });
+        setReaderNav({ isFirstPage: true, isLastPage: true, pageIndex: 0, pageCount: 1 });
     }, [currentSlideIndex]);
 
     useEffect(() => {
         if (currentSlide) {
-            broadcastSlide({
-                slideIndex: currentSlideIndex,
-                slide: currentSlide,
+            broadcast({
+                currentSlideIndex: currentSlideIndex,
+                currentSlide: currentSlide,
                 copticDate,
                 seasonLabel,
                 totalSlides: deck.length,
+                effectiveFontSize,
+                readerPageIndex: readerNav.pageIndex,
             });
         }
-    }, [currentSlideIndex, currentSlide, copticDate, seasonLabel, deck.length, broadcastSlide]);
+    }, [currentSlideIndex, currentSlide, copticDate, seasonLabel, deck.length, effectiveFontSize, readerNav.pageIndex, broadcast]);
 
     useEffect(() => {
         const h = (e: KeyboardEvent) => {
@@ -394,14 +398,14 @@ export default function PresentationPage({
                         <Button
                             variant="ghost"
                             size="icon"
-                            onClick={hasExternalWindows ? closeAllExternal : openExternalWindow}
-                            title={hasExternalWindows ? 'إغلاق الشاشات الخارجية' : 'عرض على شاشة خارجية'}
+                            onClick={hasMirrors ? closeMirrors : openMirrorWindow}
+                            title={hasMirrors ? 'إغلاق الشاشات الملحقة' : 'فتح شاشة عرض ملحقة'}
                             className="h-9 w-9 text-muted-foreground hover:text-foreground hover:bg-muted relative"
                         >
-                            {hasExternalWindows ? <MonitorX className="h-4 w-4" /> : <Monitor className="h-4 w-4" />}
-                            {externalCount > 0 && (
+                            {hasMirrors ? <MonitorX className="h-4 w-4" /> : <Monitor className="h-4 w-4" />}
+                            {mirrorCount > 0 && (
                                 <span className="absolute -top-0.5 -right-0.5 h-4 w-4 bg-primary text-primary-foreground text-[10px] flex items-center justify-center rounded-full font-bold">
-                                    {externalCount}
+                                    {mirrorCount}
                                 </span>
                             )}
                         </Button>

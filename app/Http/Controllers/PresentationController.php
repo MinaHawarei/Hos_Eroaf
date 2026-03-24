@@ -283,6 +283,11 @@ class PresentationController extends Controller
         ]);
     }
 
+    public function mirror()
+    {
+        return Inertia::render('MirrorComponent');
+    }
+
     public function search(Request $request, PresentationSearchService $presentationSearchService): JsonResponse
     {
         $q = $request->query('q', '');

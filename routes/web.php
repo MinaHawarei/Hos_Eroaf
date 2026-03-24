@@ -15,8 +15,13 @@ Route::prefix('presentation')->group(function () {
     Route::get('/search', [PresentationController::class, 'search'])
         ->middleware('throttle:60,1')
         ->name('presentation.search');
+
+    // Mirror Mode — synchronized display
+    Route::get('/mirror', [PresentationController::class, 'mirror'])->name('mirror');
+
+    Route::get('/{dayKey}', [PresentationController::class, 'lectionary'])->name('presentation.show');
 });
-Route::get('/presentation/{dayKey}', [PresentationController::class, 'lectionary'])->name('presentation.show');
+
 
 // Settings
 Route::get('/settings', [SettingsController::class, 'index'])->name('settings');
