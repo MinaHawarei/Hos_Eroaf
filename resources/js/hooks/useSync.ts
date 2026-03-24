@@ -3,14 +3,16 @@ import { useEffect, useCallback, useState, useRef } from 'react';
 const CHANNEL_NAME = 'presentation_sync';
 
 export interface SyncState {
-    currentSlide?: any;
-    currentSlideIndex?: number;
-    totalSlides?: number;
+    slideId: string;
+    currentSlide: any;
+    activeAlternativeIndex: number;
+    currentSlideIndex: number;
+    totalSlides: number;
     copticDate?: string;
     seasonLabel?: string;
-    effectiveFontSize?: number;
+    effectiveFontSize: number;
     zoomScale?: number;
-    readerPageIndex?: number;
+    readerPageIndex: number;
     timestamp: number;
 }
 
@@ -69,8 +71,6 @@ export function useSync(mode: 'source' | 'receiver' = 'source') {
         const height = window.screen.availHeight;
         const features = `width=${width},height=${height},top=0,left=${window.screen.width},menubar=no,toolbar=no,location=no,status=no,scrollbars=no,resizable=yes`;
 
-        // Using relative-to-root path to avoid issues with subdirectories if possible
-        // But the user said "relative to the base URL".
         const mirrorUrl = (window as any).route ? (window as any).route('mirror') : '/presentation/mirror';
 
         return window.open(mirrorUrl, `hos-erof-mirror-${Date.now()}`, features);

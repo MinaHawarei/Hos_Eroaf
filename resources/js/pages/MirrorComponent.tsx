@@ -8,9 +8,6 @@ export default function MirrorComponent() {
     const [interactivityEnabled, setInteractivityEnabled] = useState(true);
 
     useEffect(() => {
-        // Passive Receiver mode: We strictly listen and don't emit state-syncing actions
-        // (BroadcastChannel in receiver mode doesn't broadcast 'SYNC_STATE')
-        
         const enterFullscreen = () => {
             if (!document.fullscreenElement) {
                 document.documentElement.requestFullscreen().catch(() => {});
@@ -42,26 +39,31 @@ export default function MirrorComponent() {
             >
                 <Head title="Mirror Mode — Presentation" />
                 <div className="flex flex-col items-center gap-8 text-center p-6">
-                    <div className="relative">
-                        <div className="h-20 w-20 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
-                    </div>
-                    <div className="space-y-4">
-                        <p className="text-muted-foreground font-serif text-lg animate-pulse" dir="rtl">
-                            {interactivityEnabled 
-                                ? 'اضغط في أي مكان لتفعيل ملء الشاشة والبدء...' 
-                                : 'في انتظار بدء العرض من الشاشة الرئيسية...'}
-                        </p>
-                    </div>
+                    <div className="h-20 w-20 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+                    <p className="text-muted-foreground font-serif text-lg animate-pulse" dir="rtl">
+                        {interactivityEnabled 
+                            ? 'اضغط في أي مكان لتفعيل ملء الشاشة والبدء...' 
+                            : 'في انتظار بدء العرض من الشاشة الرئيسية...'}
+                    </p>
                 </div>
             </div>
         );
     }
 
-    const { currentSlide, effectiveFontSize, readerPageIndex } = state;
+    const { currentSlide, activeAlternativeIndex, effectiveFontSize, readerPageIndex, slideId, timestamp } = state;
+    
+    // Resolve which alternative to render specifically forcing the received index
+    let alternativeToRender = null;
+    if (currentSlide.has_alternatives && currentSlide.alternatives) {
+        alternativeToRender = currentSlide.alternatives[activeAlternativeIndex];
+    }
+
+    const displayLines = alternativeToRender ? alternativeToRender.lines : (currentSlide.lines || []);
+    const displayHasCoptic = alternativeToRender ? alternativeToRender.has_coptic : (currentSlide.has_coptic || false);
 
     return (
         <div 
-            className={`presentation-bg h-screen w-screen overflow-hidden ${interactivityEnabled ? '' : 'pointer-events-none'}`} 
+            className={`presentation-bg h-screen w-screen overflow-hidden select-none p-10 md:p-16 lg:p-20 ${interactivityEnabled ? '' : 'pointer-events-none'}`} 
             dir="rtl"
             style={{ 
                 cursor: interactivityEnabled ? 'default' : 'none',
@@ -71,33 +73,26 @@ export default function MirrorComponent() {
         >
             <Head title="Mirror View — Presentation" />
             
-            <main className="flex h-full flex-col items-center justify-center p-8 md:p-12 lg:p-16">
+            <main className="flex h-full flex-col items-center justify-center">
+                 {/* Slide Header Context */}
                  <div className="flex w-full flex-shrink-0 flex-col items-center">
                     <div className="slide-section-header pres-section-header-scale mb-4 text-center">
                         <span className="ornament" aria-hidden="true" />
                         <span>{currentSlide.section_name}</span>
                         <span className="ornament" aria-hidden="true" />
                     </div>
-                    {currentSlide.intonation_ar && (
-                        <div className="intonation-badge pres-intonation-scale mb-4 text-center">
-                            {currentSlide.intonation_ar}
-                        </div>
-                    )}
-                    <div className="ornamental-rule mb-8">
-                        <span className="ornament-diamond" />
-                    </div>
                 </div>
 
                 <div className="flex w-full flex-1 flex-col justify-center overflow-hidden">
                     <SplitViewReader
-                        key={currentSlide.id}
+                        key={`${slideId}-${activeAlternativeIndex}`}
                         initialPage={readerPageIndex ?? 0}
-                        lines={currentSlide.lines || []}
-                        hasCoptic={currentSlide.has_coptic || false}
+                        lines={displayLines}
+                        hasCoptic={displayHasCoptic}
                         justified={true}
                         className="flex min-h-0 w-full min-w-0 flex-1 flex-col justify-center"
                         fontSizePx={effectiveFontSize ?? 28}
-                        maxContentHeight={typeof window !== 'undefined' ? window.innerHeight - 250 : 800}
+                        maxContentHeight={typeof window !== 'undefined' ? window.innerHeight - 350 : 800}
                     />
                 </div>
             </main>

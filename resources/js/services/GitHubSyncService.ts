@@ -23,7 +23,7 @@ export class GitHubSyncService {
     private owner = 'MinaHawarei';
     private repo = 'Hos_Eroaf';
     private branch = 'main';
-    private contentPath = 'content'; // Directory inside the repository where the JSONs are located
+    private contentPath = 'storage/content'; // Directory inside the repository where the JSONs are located
 
     public onProgress?: (progress: SyncProgress) => void;
 

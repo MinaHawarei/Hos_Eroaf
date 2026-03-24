@@ -87,7 +87,7 @@ class ContentService
                 foreach ($entry as $altConfig) {
                     $fileName = $altConfig['file'];
                     $label = $altConfig['label'];
-                    $path = base_path("content/liturgy/{$fileName}.json");
+                    $path = base_path("storage/content/liturgy/{$fileName}.json");
 
                     if (file_exists($path)) {
                         $fileContent = json_decode(file_get_contents($path), true);

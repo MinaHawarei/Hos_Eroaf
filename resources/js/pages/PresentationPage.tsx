@@ -258,17 +258,22 @@ export default function PresentationPage({
 
     useEffect(() => {
         if (currentSlide) {
+            const signature = currentSlide.alternatives?.map((a: any) => a.label).join('|') || '';
+            const activeAlternativeIndex = altPreferences[signature] ?? currentSlide.active_index ?? 0;
+
             broadcast({
-                currentSlideIndex: currentSlideIndex,
+                slideId: currentSlide.id,
                 currentSlide: currentSlide,
+                activeAlternativeIndex: activeAlternativeIndex,
+                currentSlideIndex: currentSlideIndex,
+                totalSlides: deck.length,
                 copticDate,
                 seasonLabel,
-                totalSlides: deck.length,
                 effectiveFontSize,
                 readerPageIndex: readerNav.pageIndex,
             });
         }
-    }, [currentSlideIndex, currentSlide, copticDate, seasonLabel, deck.length, effectiveFontSize, readerNav.pageIndex, broadcast]);
+    }, [currentSlideIndex, currentSlide, copticDate, seasonLabel, deck.length, effectiveFontSize, readerNav.pageIndex, broadcast, altPreferences]);
 
     useEffect(() => {
         const h = (e: KeyboardEvent) => {
