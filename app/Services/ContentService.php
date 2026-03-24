@@ -42,8 +42,16 @@ class ContentService
         // قائمة الملفات بالترتيب الذي تريده
         $fileConfigs = [
             "ellison_emas" =>'ellison emas',
-            "our_father"=>'ابانا الذي في السموات',
-            "aliloia_fay_be" =>'الليلويا فاي بي',
+            "our_father" => [
+                ['file' => 'ابانا الذي في السموات', 'label' => 'النسخة الأولى'],
+                ['file' => 'ابانا النسخة الثانية',  'label' => 'النسخة الثانية'],
+            ],
+            "aliloia_fay_be" =>[
+
+                ['file' => 'الليلويا فاي بي', 'label' => 'النسخة الأولى'],
+                ['file' => 'الليلويا جي افمفئي',  'label' => 'النسخة الثانية'],
+
+            ],
             "oshit_alabaa" =>'اوشية الاباء',
         ];
 
@@ -55,10 +63,10 @@ class ContentService
                             && $season !== 'pentecost';
 
         if ($isGreatLentSunday || $isRegularFastingDay) {
-                $fileConfigs["aliloia_fay_be"] = 'الليلويا جي افمفئي';
+            $fileConfigs["aliloia_fay_be"] = 'الليلويا جي افمفئي';
 
         }else if( in_array($season , $FastingSeasons)){
-            $fileConfigs["aliloia_fay_be"] = 'الليلويا إي إ';
+            //$fileConfigs["aliloia_fay_be"] = 'الليلويا إي إ';
         }
 
         $variables = $data;
@@ -67,28 +75,75 @@ class ContentService
         $combinedData = [];
         $counter = 1;
 
-        foreach ($fileConfigs as $configKey => $fileName) {
-            $path = base_path("content/liturgy/{$fileName}.json");
+        foreach ($fileConfigs as $configKey => $entry) {
+            if (is_array($entry)) {
+                // ✅ Case: Alternatives
+                $alternativesArr = [];
+                $mainTitle = '';
+                $mainStyle = 1;
 
-            if (file_exists($path)) {
-                $fileContent = json_decode(file_get_contents($path), true);
+                foreach ($entry as $altConfig) {
+                    $fileName = $altConfig['file'];
+                    $label = $altConfig['label'];
+                    $path = base_path("content/liturgy/{$fileName}.json");
 
-                if ($fileContent) {
-                    $processedContent = $this->replaceVariables(
-                        $fileContent['content'] ?? [],
-                        $variables
-                    );
-                    // استخدام الـ code الموجود داخل ملف الـ json أو الـ configKey
-                    $slug = $fileContent['code'] ?? $configKey;
-                    $newKey = "{$counter}_{$slug}";
+                    if (file_exists($path)) {
+                        $fileContent = json_decode(file_get_contents($path), true);
+                        if ($fileContent) {
+                            $processedContent = $this->replaceVariables($fileContent['content'] ?? [], $variables);
+                            $altData = [
+                                "label"   => $label,
+                                "title"   => $fileContent['title'] ?? '',
+                                "style"   => $fileContent['style'] ?? 1,
+                                "content" => $processedContent ?? []
+                            ];
+                            $alternativesArr[] = $altData;
 
+                            if (empty($mainTitle)) {
+                                $mainTitle = $altData['title'];
+                                $mainStyle = $altData['style'];
+                            }
+                        }
+                    }
+                }
+
+                if (!empty($alternativesArr)) {
+                    $newKey = "{$counter}_{$configKey}";
                     $combinedData[$newKey] = [
-                        "title"   => $fileContent['title'] ?? '',
-                        "style"   => $fileContent['style'] ?? 1,
-                        "content" => $processedContent ?? []
+                        "title"            => $mainTitle,
+                        "style"            => $mainStyle,
+                        "has_alternatives" => true,
+                        "active_index"     => 0,
+                        "alternatives"     => $alternativesArr
                     ];
-
                     $counter++;
+                }
+
+            } else {
+                // ✅ Case: Single file string
+                $fileName = $entry;
+                $path = base_path("content/liturgy/{$fileName}.json");
+
+                if (file_exists($path)) {
+                    $fileContent = json_decode(file_get_contents($path), true);
+
+                    if ($fileContent) {
+                        $processedContent = $this->replaceVariables(
+                            $fileContent['content'] ?? [],
+                            $variables
+                        );
+                        $slug = $fileContent['code'] ?? $configKey;
+                        $newKey = "{$counter}_{$slug}";
+
+                        $combinedData[$newKey] = [
+                            "title"            => $fileContent['title'] ?? '',
+                            "style"            => $fileContent['style'] ?? 1,
+                            "has_alternatives" => false,
+                            "content"          => $processedContent ?? []
+                        ];
+
+                        $counter++;
+                    }
                 }
             }
         }

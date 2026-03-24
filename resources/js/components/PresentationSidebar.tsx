@@ -2,11 +2,12 @@ import React from 'react';
 import { cn } from '@/lib/utils';
 import { PanelRightClose, PanelRightOpen } from 'lucide-react';
 import { Button } from './ui/button';
+import { LiturgySection } from '@/types';
 
 interface PresentationSidebarProps {
     isOpen: boolean;
     setIsOpen: (open: boolean) => void;
-    sections: any[];
+    sections: LiturgySection[];
     currentSlideCode: string;
     onJumpToSection: (code: string) => void;
 }

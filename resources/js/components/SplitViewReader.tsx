@@ -94,12 +94,12 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
         ref
     ) => {
         const [currentPage, setCurrentPage] = useState(initialPage);
-        const [pages, setPages] = useState<Line[][]>([lines]);
+        const [pages, setPages] = useState<Line[][]>(lines?.length ? [lines] : []);
         const measureRootRef = useRef<HTMLDivElement>(null);
         const [contentWidthPx, setContentWidthPx] = useState(0);
 
-        const hasCopticScript = useMemo(() => linesHaveCopticScript(lines), [lines]);
-        const columnMode: MultiColumnMode = resolveMultiColumnMode(hasCoptic, hasCopticScript);
+        const hasCopticScript = useMemo(() => linesHaveCopticScript(lines ?? []), [lines]);
+        const columnMode: MultiColumnMode = resolveMultiColumnMode(hasCoptic ?? false, hasCopticScript);
 
         useLayoutEffect(() => {
             const el = measureRootRef.current;

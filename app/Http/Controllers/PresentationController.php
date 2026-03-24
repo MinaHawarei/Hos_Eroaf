@@ -175,15 +175,38 @@ class PresentationController extends Controller
 
         // ✅ تحويل البيانات مع دمج المتحدثين في كل قسم
         $sections = collect($Data)->map(function ($sectionData, $key) {
+            // If the section has alternatives
+            if (($sectionData['has_alternatives'] ?? false) === true) {
+                return [
+                    'id'               => $key,
+                    'code'             => $key,
+                    'name_ar'          => $sectionData['title'],
+                    'has_alternatives' => true,
+                    'active_index'     => 0,
+                    'alternatives'     => collect($sectionData['alternatives'])->map(function ($alt) {
+                        $allLines = [];
+                        foreach ($alt['content'] as $readingPart) {
+                            $partLines = ReadingLineAssembler::buildLines($readingPart);
+                            $allLines  = array_merge($allLines, $partLines);
+                        }
+                        return [
+                            'label'     => $alt['label'],
+                            'title'     => $alt['title'],
+                            'style'     => $alt['style'],
+                            'has_coptic'=> ReadingLineAssembler::readingHasCoptic($allLines),
+                            'lines'     => $allLines,
+                        ];
+                    })->values()->toArray(),
+                ];
+            }
+
+            // Normal behavior (has_alternatives === false)
             $items = $sectionData['content'] ?? [];
             $sectionTitle = $sectionData['title'];
 
-            // --- التعديل الجوهري هنا: دمج كل الأسطر من جميع المتحدثين في مصفوفة واحدة ---
             $allLinesInOneReading = [];
             foreach ($items as $readingPart) {
-                // نستخدم دالتك buildLines لجلب أسطر هذا المتحدث
                 $partLines = ReadingLineAssembler::buildLines($readingPart);
-                // ندمجها مع المصفوفة الكبيرة للقسم
                 $allLinesInOneReading = array_merge($allLinesInOneReading, $partLines);
             }
 
@@ -193,23 +216,48 @@ class PresentationController extends Controller
                 'id' => $key,
                 'code' => $key,
                 'name_ar' => $sectionTitle,
+                'has_alternatives' => false,
                 'readings' => [
                     [
-                        'id' => 1, // دائماً واحد لأننا دمجناهم
+                        'id' => 1,
                         'title_ar' => $sectionTitle,
                         'intonation_ar' => null,
                         'has_coptic' => $hasCoptic,
-                        'lines' => $allLinesInOneReading, // الأسطر المدمجة
+                        'lines' => $allLinesInOneReading,
                         'style' => 1,
                     ],
                 ],
             ];
         })->values();
 
-        // ✅ بناء السلايدات (كل قسم سيصبح Slide واحدة الآن)
+        // ✅ Build slides
         $slides = [];
         foreach ($sections as $section) {
-            // بما أن كل قسم لديه مصفوفة readings فيها عنصر واحد فقط الآن
+            if ($section['has_alternatives'] === true) {
+                // Only add this slide if at least the first alternative has non-empty lines
+                if (empty($section['alternatives'][0]['lines'])) {
+                    continue;
+                }
+
+                $slides[] = [
+                    'id'               => "slide-{$section['code']}",
+                    'section_code'     => $section['code'],
+                    'section_name'     => $section['name_ar'],
+                    'has_alternatives' => true,
+                    'active_index'     => 0,
+                    'alternatives'     => array_map(function ($alt) {
+                        return [
+                            'label'     => $alt['label'],
+                            'title'     => $alt['title'],
+                            'lines'     => $alt['lines'],
+                            'has_coptic'=> $alt['has_coptic'],
+                        ];
+                    }, $section['alternatives']),
+                ];
+                continue;
+            }
+
+            // Normal section slides
             $reading = $section['readings'][0];
 
             if (empty($reading['lines'])) {
@@ -226,7 +274,7 @@ class PresentationController extends Controller
                 'has_coptic' => $reading['has_coptic'],
             ];
         }
-
+        //dd($slides);
         return Inertia::render('PresentationPage', [
             'dayKey' => $dayKey,
             'sections' => $sections,

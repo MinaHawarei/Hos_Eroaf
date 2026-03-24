@@ -25,21 +25,27 @@ import {
 } from 'lucide-react';
 import Cookies from 'js-cookie';
 
+import { LiturgySection, SlideAlternativeItem, SlideAlternativeSection } from '@/types';
+import { AlternativeSwitcher } from '@/components/Liturgy/AlternativeSwitcher';
+
 interface Slide {
     id: string;
     section_code: string;
     section_name: string;
-    intonation_ar: string;
-    title: string;
-    lines: any[];
-    has_coptic: boolean;
+    intonation_ar?: string | null;
+    title?: string;
+    lines?: any[];
+    has_coptic?: boolean;
+    has_alternatives?: boolean;
+    active_index?: number;
+    alternatives?: SlideAlternativeItem[];
 }
 
 interface PresentationPageProps {
     dayKey: string;
     copticDate: string;
     seasonLabel: string;
-    sections: any[];
+    sections: LiturgySection[];
     slides: Slide[];
     defaultBaseFontSize?: number;
 }
@@ -75,6 +81,8 @@ export default function PresentationPage({
     const [highlightQuery, setHighlightQuery] = useState<string | undefined>(undefined);
     const [isSplitting, setIsSplitting] = useState(true);
     const [splitInfo, setSplitInfo] = useState<SplitResult | null>(null);
+    // تفضيلات الاختيار العالمية — key = مجموعة labels مع بعض (signature)، value = index
+    const [altPreferences, setAltPreferences] = useState<Record<string, number>>({});
 
     const [baseFontSize] = useState(() => {
         const fromCookie = Number(Cookies.get('baseFontSize'));
@@ -452,18 +460,61 @@ export default function PresentationPage({
                         ref={readerSlotRef}
                         className="flex min-h-0 w-full flex-1 flex-col justify-center overflow-hidden"
                     >
-                        <SplitViewReader
-                            key={currentSlide.id}
-                            ref={readerRef}
-                            lines={currentSlide.lines}
-                            hasCoptic={currentSlide.has_coptic}
-                            justified={true}
-                            className="flex min-h-0 w-full min-w-0 flex-1 flex-col justify-center"
-                            maxContentHeight={readerSlotHeight}
-                            fontSizePx={effectiveFontSize}
-                            highlightQuery={highlightQuery}
-                            onPaginationMetaChange={setReaderNav}
-                        />
+                        {currentSlide.has_alternatives && currentSlide.alternatives ? (() => {
+                            // signature = labels مع بعض تعرّف نوع الاختيار
+                            const signature = currentSlide.alternatives.map(a => a.label).join('|');
+                            const activeIdx = altPreferences[signature] ?? currentSlide.active_index ?? 0;
+                            const activeAlt = currentSlide.alternatives[activeIdx];
+                            const slideAsSection: SlideAlternativeSection = {
+                                id: currentSlide.id,
+                                section_code: currentSlide.section_code,
+                                section_name: currentSlide.section_name,
+                                has_alternatives: true,
+                                active_index: activeIdx,
+                                alternatives: currentSlide.alternatives,
+                            };
+                            return (
+                                <>
+                                    <SplitViewReader
+                                        key={`${currentSlide.id}-alt-${activeIdx}`}
+                                        ref={readerRef}
+                                        lines={activeAlt?.lines ?? []}
+                                        hasCoptic={activeAlt?.has_coptic ?? false}
+                                        justified={true}
+                                        className="flex min-h-0 w-full min-w-0 flex-1 flex-col justify-center"
+                                        maxContentHeight={readerSlotHeight}
+                                        fontSizePx={effectiveFontSize}
+                                        highlightQuery={highlightQuery}
+                                        onPaginationMetaChange={setReaderNav}
+                                    />
+                                    {/* الزرار ثابت أسفل يسار */}
+                                    <div className="fixed bottom-20 left-4 z-40">
+                                        <AlternativeSwitcher
+                                            section={slideAsSection}
+                                            onSelect={(index) => {
+                                                setAltPreferences((prev) => ({
+                                                    ...prev,
+                                                    [signature]: index,
+                                                }));
+                                            }}
+                                        />
+                                    </div>
+                                </>
+                            );
+                        })() : (
+                            <SplitViewReader
+                                key={currentSlide.id}
+                                ref={readerRef}
+                                lines={currentSlide.lines ?? []}
+                                hasCoptic={currentSlide.has_coptic ?? false}
+                                justified={true}
+                                className="flex min-h-0 w-full min-w-0 flex-1 flex-col justify-center"
+                                maxContentHeight={readerSlotHeight}
+                                fontSizePx={effectiveFontSize}
+                                highlightQuery={highlightQuery}
+                                onPaginationMetaChange={setReaderNav}
+                            />
+                        )}
                     </div>
                 </div>
             </main>

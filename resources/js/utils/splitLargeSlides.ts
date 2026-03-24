@@ -20,10 +20,11 @@ interface Slide {
     id: string;
     section_code: string;
     section_name: string;
-    intonation_ar: string;
-    title: string;
-    lines: Line[];
-    has_coptic: boolean;
+    intonation_ar?: string | null;
+    title?: string;
+    lines?: Line[];
+    has_coptic?: boolean;
+    has_alternatives?: boolean;
 }
 
 // ✅ تأكد من تصدير هذه الواجهة
@@ -85,11 +86,14 @@ async function splitSingleSlide(
     containerWidthPx: number,
     measureAdapter: any
 ): Promise<Slide[]> {
+    // شرائح الـ alternatives مفيهاش lines مباشرة — مش محتاجة تتقسم
+    if (slide.has_alternatives || !slide.lines || slide.lines.length === 0) {
+        return [slide];
+    }
+
     // تحديد وضع الأعمدة
     const hasCopticScript = slide.lines.some(line => line.lang_type === 'coptic');
-    const columnMode = resolveMultiColumnMode(slide.has_coptic, hasCopticScript);
-
-    // استخدام نفس منطق computeSlidePages لتقسيم المحتوى
+    const columnMode = resolveMultiColumnMode(slide.has_coptic ?? false, hasCopticScript);
     const tolerance = paginationTolerancePx(maxHeightPx);
     const reserve = paginationVerticalReservePx(fontSizePx);
     const contentBudget = Math.max(64, maxHeightPx - reserve);
@@ -193,8 +197,12 @@ export async function estimateSlideHeight(
     containerWidthPx: number,
     measureAdapter: any
 ): Promise<number> {
+    if (slide.has_alternatives || !slide.lines || slide.lines.length === 0) {
+        return 0;
+    }
+
     const hasCopticScript = slide.lines.some(line => line.lang_type === 'coptic');
-    const columnMode = resolveMultiColumnMode(slide.has_coptic, hasCopticScript);
+    const columnMode = resolveMultiColumnMode(slide.has_coptic ?? false, hasCopticScript);
 
     let totalHeight = 0;
     const speakerExtra = speakerBlockExtraPx(fontSizePx);
