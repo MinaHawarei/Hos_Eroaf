@@ -38,14 +38,33 @@ export function SearchOverlay({
     const [globalResults, setGlobalResults] = useState<GlobalSearchResult[]>([]);
     const [loading, setLoading] = useState(false);
 
-    useEffect(() => {
-        if (!open) {
-            return;
-        }
-        setMode('local');
-        setQuery('');
-        setLocalGrouped({});
-        setGlobalResults([]);
+useEffect(() => {
+        if (!open) return;
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // المفاتيح اللي عايزين نعطل تأثيرها الـ Global
+            const keysToInhibit = [' ', 'ArrowUp', 'ArrowDown', 'PageUp', 'PageDown'];
+
+            if (keysToInhibit.includes(e.key)) {
+                // نتحقق إذا كان المستخدم بيكتب فعلاً في الـ input
+                const isInput = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
+
+                if (isInput) {
+                    // نوقف انتشار الحدث عشان الـ global listeners (زي مكتبات الـ slides) ما تحسش بيه
+                    e.stopPropagation();
+                } else {
+                    // لو ضغط مسطرة وهو مش في الـ input، نمنع الأكشن الافتراضي (السكول مثلاً)
+                    if (e.key === ' ') e.preventDefault();
+                }
+            }
+        };
+
+        // نستخدم capture: true عشان نلقط الحدث قبل ما يوصل لأي حد تاني
+        document.addEventListener('keydown', handleKeyDown, { capture: true });
+
+        return () => {
+            document.removeEventListener('keydown', handleKeyDown, { capture: true });
+        };
     }, [open]);
 
     useEffect(() => {
@@ -125,7 +144,7 @@ export function SearchOverlay({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-2xl bg-card p-0 overflow-hidden border-border shadow-lg">
+            <DialogContent className="sm:max-w-2xl bg-card p-1 pt-10 overflow-hidden border-border shadow-lg">
                 <DialogTitle className="sr-only">البحث في القراءات</DialogTitle>
                 <div className="flex flex-col border-b border-border">
                     <div className="flex p-1 gap-1 mx-3 mt-3 rounded-lg bg-muted/40">

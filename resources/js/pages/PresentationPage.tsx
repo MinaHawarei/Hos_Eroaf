@@ -436,8 +436,10 @@ export default function PresentationPage({
 
             <main
                 ref={mainRef}
-                className="flex min-h-0 flex-1 flex-col items-stretch justify-start overflow-hidden px-8 pt-4 md:px-10 md:pt-5"
+                // ضفنا pb-24 عشان النص ميستخباش ورا الأزرار العائمة تحت
+                className="flex min-h-0 flex-1 flex-col items-stretch justify-start overflow-hidden px-8 pt-4 pb-20 md:px-10 md:pt-5 md:pb-24"
             >
+                {/* محتوى الشريحة كما هو بدون تغيير */}
                 <div className="pres-slide-column flex min-h-0 w-full max-w-none flex-1 flex-col justify-start">
                     <div className="flex w-full flex-shrink-0 flex-col items-center">
                         <div className="slide-section-header pres-section-header-scale mb-3 text-center md:mb-4">
@@ -453,7 +455,6 @@ export default function PresentationPage({
                         <div className="ornamental-rule mb-3 md:mb-4">
                             <span className="ornament-diamond" />
                         </div>
-
                     </div>
 
                     <div
@@ -461,7 +462,6 @@ export default function PresentationPage({
                         className="flex min-h-0 w-full flex-1 flex-col justify-center overflow-hidden"
                     >
                         {currentSlide.has_alternatives && currentSlide.alternatives ? (() => {
-                            // signature = labels مع بعض تعرّف نوع الاختيار
                             const signature = currentSlide.alternatives.map(a => a.label).join('|');
                             const activeIdx = altPreferences[signature] ?? currentSlide.active_index ?? 0;
                             const activeAlt = currentSlide.alternatives[activeIdx];
@@ -487,8 +487,7 @@ export default function PresentationPage({
                                         highlightQuery={highlightQuery}
                                         onPaginationMetaChange={setReaderNav}
                                     />
-                                    {/* الزرار ثابت أسفل يسار */}
-                                    <div className="fixed bottom-20 left-4 z-40">
+                                    <div className="fixed bottom-2 left-16 z-40">
                                         <AlternativeSwitcher
                                             section={slideAsSection}
                                             onSelect={(index) => {
@@ -519,17 +518,24 @@ export default function PresentationPage({
                 </div>
             </main>
 
+            {/* أزرار التقليب العائمة */}
             <div
-                className={`fixed bottom-4 left-0 right-0 z-30 flex items-center justify-center pointer-events-none transition-all duration-500 ${isFullscreen ? 'opacity-0 hover:opacity-100' : ''}`}
+                // الحاوية الأساسية شفافة وبتاخد مساحة من تحت عشان تلقط الماوس
+                className="fixed bottom-0 left-0 right-0 z-30 flex h-24 items-end justify-center pb-6 pointer-events-none"
             >
-                <div className="flex items-center gap-3 pointer-events-auto pres-nav-controls rounded-full px-4 py-2">
+                <div
+                    // هنا الـ Hover والشفافية في وضعية الـ Fullscreen
+                    className={`flex items-center gap-3 pointer-events-auto pres-nav-controls rounded-full px-4 py-2 transition-all duration-500 ${
+                        isFullscreen ? 'opacity-0 hover:opacity-100' : 'opacity-100'
+                    }`}
+                >
                     <Button
                         size="icon"
                         variant="ghost"
                         className="h-10 w-10 md:h-12 md:w-12 rounded-full hover:bg-muted disabled:opacity-30 text-foreground"
-                        onClick={handlePrevSlide}
-                        disabled={currentSlideIndex === 0 && readerNav.isFirstPage}
-                        aria-label="الشريحة السابقة"
+                        onClick={handleNextSlide}
+                        disabled={currentSlideIndex === deck.length - 1 && readerNav.isLastPage}
+                        aria-label="الشريحة التالية"
                     >
                         <ChevronRight className="h-6 w-6 md:h-7 md:w-7" />
                     </Button>
@@ -542,17 +548,22 @@ export default function PresentationPage({
                         size="icon"
                         variant="ghost"
                         className="h-10 w-10 md:h-12 md:w-12 rounded-full hover:bg-muted disabled:opacity-30 text-foreground"
-                        onClick={handleNextSlide}
-                        disabled={currentSlideIndex === deck.length - 1 && readerNav.isLastPage}
-                        aria-label="الشريحة التالية"
+                        onClick={handlePrevSlide}
+                        disabled={currentSlideIndex === 0 && readerNav.isFirstPage}
+                        aria-label="الشريحة السابقة"
                     >
                         <ChevronLeft className="h-6 w-6 md:h-7 md:w-7" />
                     </Button>
+
                 </div>
             </div>
 
+            {/* أزرار التكبير والتصغير العائمة */}
             <div
-                className={`fixed bottom-24 left-4 z-40 flex flex-col gap-2 transition-all duration-500 ${isFullscreen ? 'opacity-0 hover:opacity-100' : ''}`}
+                // ضفنا pointer-events-auto هنا عشان نقدر نضغط عليهم حتى لو الشفافية 0 وفي حالة الـ Hover بيظهروا
+                className={`fixed bottom-4 left-4 z-40 flex flex-col gap-2 pointer-events-auto transition-all duration-500 ${
+                    isFullscreen ? 'opacity-0 hover:opacity-100' : 'opacity-100'
+                }`}
             >
                 <Button
                     size="icon"
