@@ -9,7 +9,7 @@ class ContentService
     public function getByDayIndex(int $day): ?array
     {
         $file = str_pad($day, 3, '0', STR_PAD_LEFT);
-        $path = base_path("content/lectionary/{$file}.json");
+        $path = base_path("storage/content/lectionary/{$file}.json");
         if (!file_exists($path)) {
             return null;
         }
@@ -19,7 +19,7 @@ class ContentService
     public function getLectionary(string|int $day): ?array
     {
         $file = str_pad($day, 3, '0', STR_PAD_LEFT);
-        $path = base_path("content/lectionary/{$file}.json");
+        $path = base_path("storage/content/lectionary/{$file}.json");
         if (!file_exists($path)) {
             return null;
         }
@@ -124,7 +124,7 @@ class ContentService
             } else {
                 // ✅ Case: Single file string
                 $fileName = $entry;
-                $path = base_path("content/liturgy/{$fileName}.json");
+                $path = base_path("storage/content/liturgy/{$fileName}.json");
 
                 if (file_exists($path)) {
                     $fileContent = json_decode(file_get_contents($path), true);
