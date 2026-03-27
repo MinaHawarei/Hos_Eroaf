@@ -26,6 +26,7 @@ type Bishop = {
     name: string;
     role: string; // مطران أو أسقف
     coRole: string; // أبيسكوبوس أو متروبوليتيس
+    DefNoun: string; // ان أو ام
 };
 
 type Props = {
@@ -64,6 +65,7 @@ export default function Settings({
             name: '',
             role: 'أسقف',
             coRole: 'أبيسكوبوس',
+            DefNoun: 'ان ',
         },
         hasVisitingBishops: initialChurchData?.visiting_bishops?.length > 0 || false,
         visiting_bishops: initialChurchData?.visiting_bishops || ([] as Bishop[]),
@@ -75,18 +77,25 @@ export default function Settings({
         if (role === 'أسقف') return 'أبيسكوبوس';
         return 'أبيسكوبوس';
     };
+    const getDefNoun = (role: string) => {
+        if (role === 'مطران') return 'ام';
+        if (role === 'أسقف') return 'ان ';
+        return 'ان ';
+    };
+
 
     const handleDiocesanRoleChange = (role: string) => {
         setData('diocesan_bishop', {
             ...data.diocesan_bishop,
             role,
             coRole: getCoRole(role),
+            DefNoun: getDefNoun(role),
         });
     };
 
     const handleSaveChurchData = (e: React.FormEvent) => {
         e.preventDefault();
-        
+
         // Save to js-cookie for immediate UI availability
         const dataToSave = {
             patron: data.patron,
@@ -94,7 +103,7 @@ export default function Settings({
             diocesan_bishop: data.diocesan_bishop,
             visiting_bishops: data.hasVisitingBishops ? data.visiting_bishops : [],
         };
-        
+
         Cookies.set('church_settings', JSON.stringify(dataToSave), { expires: 365, path: '/' });
         Cookies.set('baseFontSize', data.baseFontSize.toString(), { expires: 365, path: '/' });
 
@@ -107,7 +116,7 @@ export default function Settings({
     };
 
     const addVisitingBishop = () => {
-        setData('visiting_bishops', [...data.visiting_bishops, { name: '', role: 'أسقف', coRole: 'أبيسكوبوس' }]);
+        setData('visiting_bishops', [...data.visiting_bishops, { name: '', role: 'أسقف', coRole: 'أبيسكوبوس', DefNoun: 'ان ' }]);
     };
 
     const removeVisitingBishop = (index: number) => {
@@ -120,6 +129,7 @@ export default function Settings({
         newBishops[index] = { ...newBishops[index], [field]: value };
         if (field === 'role') {
             newBishops[index].coRole = getCoRole(value);
+            newBishops[index].DefNoun = getDefNoun(value);
         }
         setData('visiting_bishops', newBishops);
     };
@@ -129,7 +139,7 @@ export default function Settings({
         setUpdateResult(null);
         try {
             const syncService = new GitHubSyncService();
-            
+
             syncService.onProgress = (progress) => {
                 if (progress.status === 'downloading') {
                     setUpdateResult('syncing');
@@ -138,7 +148,7 @@ export default function Settings({
             };
 
             const hasUpdates = await syncService.checkForUpdates();
-            
+
             if (!hasUpdates) {
                 setUpdateResult('none');
                 setCheckingUpdates(false);
@@ -219,7 +229,7 @@ export default function Settings({
                         {/* Diocesan Bishop */}
                         <div className="rounded-xl border border-border/60 bg-muted/10 p-4 space-y-4">
                             <h3 className="text-sm font-bold text-foreground">أسقف الإيبارشية / رئيس الدير</h3>
-                            
+
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="space-y-1.5">
                                     <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">الرتبة</label>
@@ -240,9 +250,15 @@ export default function Settings({
                                         value={data.diocesan_bishop.coRole}
                                         className="w-full rounded-lg bg-muted/50 p-2 text-sm border border-border outline-none opacity-80 cursor-not-allowed"
                                     />
+                                    <input
+                                        type="text"
+                                        disabled
+                                        value={data.diocesan_bishop.DefNoun}
+                                        className="hidden"
+                                    />
                                 </div>
                             </div>
-                            
+
                             <div className="space-y-1.5">
                                 <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">اسم الأب</label>
                                 <input
@@ -295,6 +311,12 @@ export default function Settings({
                                                     value={bishop.coRole}
                                                     className="w-full rounded-lg bg-muted/50 p-2 text-sm border border-border outline-none opacity-80 cursor-not-allowed"
                                                 />
+                                                <input
+                                                    type="text"
+                                                    disabled
+                                                    value={bishop.DefNoun}
+                                                    className="hidden"
+                                                />
                                             </div>
                                         </div>
                                         <div className="space-y-1">
@@ -345,7 +367,7 @@ export default function Settings({
                         <Monitor className="h-4.5 w-4.5 text-primary" />
                         إعدادات العرض
                     </h2>
-                    
+
                     <div className="space-y-4">
                         <div className="space-y-3">
                             <div className="flex items-center justify-between">
@@ -357,7 +379,7 @@ export default function Settings({
                                     {data.baseFontSize}px
                                 </span>
                             </div>
-                            
+
                             <input
                                 type="range"
                                 min="20"
@@ -371,7 +393,7 @@ export default function Settings({
                                 }}
                                 className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
                             />
-                            
+
                             <div className="flex justify-between text-xs text-muted-foreground mt-1">
                                 <span>صغير (20)</span>
                                 <span>كبير (80)</span>
@@ -434,8 +456,8 @@ export default function Settings({
                                     </span>
                                 </div>
                                 <div className="w-full bg-blue-200 dark:bg-blue-900/40 rounded-full h-1.5 mt-2">
-                                    <div 
-                                        className="bg-blue-600 dark:bg-blue-500 h-1.5 rounded-full transition-all duration-300" 
+                                    <div
+                                        className="bg-blue-600 dark:bg-blue-500 h-1.5 rounded-full transition-all duration-300"
                                         style={{ width: `${(syncProgress.current / (syncProgress.total || 1)) * 100}%` }}
                                     ></div>
                                 </div>

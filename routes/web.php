@@ -27,6 +27,7 @@ Route::prefix('presentation')->group(function () {
 Route::prefix('admin/content')->group(function () {
     Route::get('/', [ContentManagerController::class, 'index'])->name('content.index');
     Route::get('/{category}/{filename}', [ContentManagerController::class, 'show'])->name('content.show');
+    Route::post('/store', [ContentManagerController::class, 'store'])->name('content.store');
     Route::post('/update', [ContentManagerController::class, 'update'])->name('content.update');
 });
 

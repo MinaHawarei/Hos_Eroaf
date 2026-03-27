@@ -136,7 +136,7 @@ function LiturgyForm({ content, onChange }: { content: any; onChange: (c: any) =
                             </select>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4" dir="rtl">
                             <div>
                                 <label className="label-xs">النص العربي</label>
                                 <textarea

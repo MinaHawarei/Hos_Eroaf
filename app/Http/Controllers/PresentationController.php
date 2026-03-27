@@ -142,7 +142,9 @@ class PresentationController extends Controller
         $patron = $churchSettings['patron'] ?? 'العذراء مريم';
         $diocesan_bishop = $churchSettings['diocesan_bishop'] ?? null;
         $visiting_bishops = $churchSettings['visiting_bishops'] ?? [];
-
+        if($diocesan_bishop['DefNoun'] === 'ان'){
+            $diocesan_bishop['DefNoun'] = 'ان ';
+        }
         $data = [
             'dayKey' => $dayKey,
             'dayName' => $dayName,
@@ -154,6 +156,7 @@ class PresentationController extends Controller
             // Fallbacks for compatibility if ContentService relies on old keys
             'bishoprole' => $diocesan_bishop['role'] ?? 'أسقف',
             'bishopCoRole' => $diocesan_bishop['coRole'] ?? 'أبيسكوبوس',
+            'DefNoun' => $diocesan_bishop['DefNoun'] ?? 'ان',
             'bishopname' => $diocesan_bishop['name'] ?? '',
         ];
 

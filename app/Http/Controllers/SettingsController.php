@@ -30,10 +30,12 @@ class SettingsController extends Controller
             'diocesan_bishop.name' => 'nullable|string',
             'diocesan_bishop.role' => 'nullable|string',
             'diocesan_bishop.coRole' => 'nullable|string',
+            'diocesan_bishop.DefNoun' => 'nullable|string',
             'visiting_bishops' => 'nullable|array',
             'visiting_bishops.*.name' => 'nullable|string',
             'visiting_bishops.*.role' => 'nullable|string',
             'visiting_bishops.*.coRole' => 'nullable|string',
+            'visiting_bishops.*.DefNoun' => 'nullable|string',
         ]);
 
         return back()->withCookie(cookie('church_settings', json_encode($validated), 60 * 24 * 365, null, null, false, false));
