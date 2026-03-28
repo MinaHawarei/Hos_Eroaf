@@ -11,7 +11,7 @@ interface OriginalSlide {
     id: string;
     section_code: string;
     section_name: string;
-    intonation_ar: string;
+    intonation: string;
     title: string;
     lines: any[];
     has_coptic: boolean;

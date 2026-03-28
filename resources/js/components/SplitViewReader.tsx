@@ -26,6 +26,8 @@ export interface Line {
     lang_type: 'arabic' | 'coptic_arabized' | 'coptic';
     text: string;
     speaker?: string;
+    intonation?: string;
+    conclusion?: string;
 }
 
 export interface SplitViewReaderProps {
@@ -36,7 +38,9 @@ export interface SplitViewReaderProps {
     maxContentHeight: number;
     fontSizePx: number;
     highlightQuery?: string;
-    initialPage?: number; // أضف هذا السطر
+    initialPage?: number;
+    intonation?: string | null;
+    conclusion?: string | null;
     onPaginationMetaChange?: (meta: {
         isFirstPage: boolean;
         isLastPage: boolean;
@@ -89,6 +93,8 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
             fontSizePx,
             highlightQuery,
             initialPage = 0,
+            intonation,
+            conclusion,
             onPaginationMetaChange,
         },
         ref
@@ -183,7 +189,6 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
             emitMeta(currentPage, pages);
         }, [currentPage, pages, emitMeta]);
 
-
         useImperativeHandle(
             ref,
             () => ({
@@ -212,6 +217,7 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
         );
 
         const currentLines = pages[currentPage] || [];
+        const isLastPage = pages.length === 0 || currentPage === pages.length - 1;
 
         const getSpeakerStyles = (speaker?: string) => {
             if (!speaker) return '';
@@ -233,7 +239,6 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
         const renderSpeakerBar = (currentSpeaker: string, compact: boolean) => {
             const isDual = columnMode === 'dual';
 
-            // Unified badge styling for all modes
             const badgeClasses = cn(
                 'pres-speaker-badge-lg px-5 py-1.5 rounded-xl font-black border shadow-sm transition-all',
                 getSpeakerStyles(currentSpeaker)
@@ -248,11 +253,8 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
                             'gap-3 md:gap-4'
                         )}
                     >
-                        {/* Right side line - matches Arabic column (40%) */}
-                        <div className="hidden md:flex md:basis-[40%] items-center">
-                        </div>
+                        <div className="hidden md:flex md:basis-[40%] items-center" />
 
-                        {/* Middle Badge - positioned at the divider for dual mode */}
                         <div className="w-full md:w-px md:flex-none flex items-center justify-center overflow-visible">
                             <div className="h-px flex-1 bg-gradient-to-l from-transparent to-muted-foreground/30 md:hidden" />
                             <span className={badgeClasses}>
@@ -261,14 +263,11 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
                             <div className="h-px flex-1 bg-gradient-to-r from-transparent to-muted-foreground/30 md:hidden" />
                         </div>
 
-                        {/* Left side line - matches Coptic column (60%) */}
-                        <div className="hidden md:flex md:basis-[60%] items-center">
-                        </div>
+                        <div className="hidden md:flex md:basis-[60%] items-center" />
                     </div>
                 );
             }
 
-            // Default behavior for Single and Triple column modes (centered)
             return (
                 <div className={cn('flex w-full items-center', compact ? 'gap-2 my-1' : 'gap-2 my-1.5')}>
                     <div className="h-px flex-1 bg-gradient-to-l from-transparent to-muted-foreground/30" />
@@ -289,6 +288,17 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
                         className
                     )}
                 >
+                    {/* المقدمة — تظهر فقط في الصفحة الأولى */}
+                    {intonation && currentPage === 0 && (
+                        <div className="flex w-full items-center gap-2 my-1.5">
+                            <div className="h-px flex-1 bg-gradient-to-l from-transparent to-muted-foreground/30" />
+                            <span className="pres-intonation-scale px-5 py-1.5 rounded-xl font-black border shadow-sm bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-800">
+                                {intonation}
+                            </span>
+                            <div className="h-px flex-1 bg-gradient-to-r from-transparent to-muted-foreground/30" />
+                        </div>
+                    )}
+
                     {currentLines.map((line, index) => {
                         const prevSpeaker = index > 0 ? currentLines[index - 1].speaker : null;
                         const shouldShowSpeaker = line.speaker && line.speaker !== prevSpeaker;
@@ -307,6 +317,17 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
                             </div>
                         );
                     })}
+
+                    {/* الخاتمة — تظهر فقط في الصفحة الأخيرة */}
+                    {conclusion && isLastPage && (
+                        <div className="flex w-full items-center gap-2 my-1.5">
+                            <div className="h-px flex-1 bg-gradient-to-l from-transparent to-muted-foreground/30" />
+                            <span className="pres-conclusion-scale px-5 py-1.5 rounded-xl font-black border shadow-sm bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-800">
+                                {conclusion}
+                            </span>
+                            <div className="h-px flex-1 bg-gradient-to-r from-transparent to-muted-foreground/30" />
+                        </div>
+                    )}
                 </div>
             );
         }
@@ -331,6 +352,17 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
                     className
                 )}
             >
+                {/* المقدمة — تظهر فقط في الصفحة الأولى */}
+                {intonation && currentPage === 0 && (
+                    <div className="flex w-full items-center gap-2 my-1.5">
+                        <div className="h-px flex-1 bg-gradient-to-l from-transparent to-muted-foreground/30" />
+                        <span className="pres-intonation-scale px-5 py-1.5 rounded-xl font-black border shadow-sm bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-800">
+                            {intonation}
+                        </span>
+                        <div className="h-px flex-1 bg-gradient-to-r from-transparent to-muted-foreground/30" />
+                    </div>
+                )}
+
                 {pairedLines.map(([ar, arcop, cop], index) => {
                     const showAr = hasText(ar);
                     const showArcop = hasText(arcop);
@@ -431,6 +463,17 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
                         </div>
                     );
                 })}
+
+                {/* الخاتمة — تظهر فقط في الصفحة الأخيرة */}
+                {conclusion && isLastPage && (
+                    <div className="flex w-full items-center gap-2 my-1.5">
+                        <div className="h-px flex-1 bg-gradient-to-l from-transparent to-muted-foreground/30" />
+                        <span className="pres-conclusion-scale px-5 py-1.5 rounded-xl font-black border shadow-sm bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-800">
+                            {conclusion}
+                        </span>
+                        <div className="h-px flex-1 bg-gradient-to-r from-transparent to-muted-foreground/30" />
+                    </div>
+                )}
             </div>
         );
     }

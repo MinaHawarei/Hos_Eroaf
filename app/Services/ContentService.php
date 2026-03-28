@@ -60,8 +60,8 @@ class ContentService
                     "has_alternatives" => false,
 
                     // 👇 الجديد
-                    "intonation_ar" => $item['intonation_ar'] ?? null,
-                    "intonation_co" => $item['intonation_co'] ?? null,
+                    "intonation" => $item['intonation'] ?? null,
+                    "conclusion" => $item['conclusion'] ?? null,
 
                     "content" => $content
                 ];
@@ -97,8 +97,8 @@ class ContentService
             ],
             "aliloia_fay_be" =>[
 
-                ['file' => 'الليلويا فاي بي', 'label' => 'النسخة الأولى'],
-                ['file' => 'الليلويا جي افمفئي',  'label' => 'النسخة الثانية'],
+                ['file' => 'الهيتنيات', 'label' => 'الهيتنيات'],
+                ['file' => 'الهيتنيات مجمعة',  'label' => 'الهيتنيات مجمعة'],
 
             ],
             "oshit_alabaa" =>'اوشية الاباء',
@@ -234,17 +234,21 @@ class ContentService
             "tahlil_alkhodam"=>'تحليل الخدام',
             "ne_saviv"=>'ني صافيف',
             "te_shory"=>'تي شوري',
-            "hetaniat"=>'الهيتنيات',
-
-            // 👇 الرسائل
+            "hetaniat" =>[
+                ['file' => 'الهيتنيات', 'label' => 'الهيتنيات'],
+                ['file' => 'الهيتنيات مجمعة',  'label' => 'الهيتنيات مجمعة'],
+            ],
+            "be_ehmot_ghar"=>'بي اهموت غار الصغير',
             "pauline" => ['type' => 'lectionary'],
             "catholic" => ['type' => 'lectionary'],
+            "marad_praxis"=>'اري باميفي',
             "praxis" => ['type' => 'lectionary'],
-
-
             "synaxarium" => ['type' => 'lectionary'],
+            "mi_ghalo"=>'لحن ميغالو',
+            "mohaier_abenshoais"=>'محير ابنشويس',
+            "oshait_al_angeal"=>'اوشية الانجيل',
+            "maro_etshasf"=>'مارو اتشاسف',
 
-            // 👇 إنجيل القداس
             "liturgy_psalm" => ['type' => 'lectionary'],
             "liturgy_gospel" => ['type' => 'lectionary'],
         ];

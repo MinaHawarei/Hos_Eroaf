@@ -66,8 +66,8 @@ class PresentationController extends Controller
                             return [
                                 'id' => $index + 1,
                                 'title_ar' => $reading['title_ar'] ?? $sectionName,
-                                'intonation_ar' => $reading['intonation_ar'] ?? null,
-                                'intonation_co' => $reading['intonation_co'] ?? null,
+                                'intonation' => $reading['intonation'] ?? null,
+                                'conclusion' => $reading['conclusion'] ?? null,
                                 'has_coptic' => $hasCoptic,
                                 'lines' => $lines,
                                 'style' => 1,
@@ -96,8 +96,8 @@ class PresentationController extends Controller
                     'section_code' => $section['code'],
                     'section_name' => $section['name_ar'],
                     'title' => $reading['title_ar'],
-                    'intonation_ar' => $reading['intonation_ar'], // ✅ بدون قيمة افتراضية
-                    'intonation_co' => $reading['intonation_co'], // ✅ بدون قيمة افتراضية
+                    'intonation' => $reading['intonation'], // ✅ بدون قيمة افتراضية
+                    'conclusion' => $reading['conclusion'], // ✅ بدون قيمة افتراضية
                     'lines' => $reading['lines'],
                     'has_coptic' => $hasCoptic,
                 ];
@@ -178,6 +178,7 @@ class PresentationController extends Controller
 
         // ✅ تحويل البيانات مع دمج المتحدثين في كل قسم
         $sections = collect($Data)->map(function ($sectionData, $key) {
+
             // If the section has alternatives
             if (($sectionData['has_alternatives'] ?? false) === true) {
                 return [
@@ -202,10 +203,11 @@ class PresentationController extends Controller
                     })->values()->toArray(),
                 ];
             }
-
             // Normal behavior (has_alternatives === false)
             $items = $sectionData['content'] ?? [];
             $sectionTitle = $sectionData['title'];
+            $intonation = $sectionData['intonation']?? null;
+            $conclusion = $sectionData['conclusion']?? null;
 
             $allLinesInOneReading = [];
             foreach ($items as $readingPart) {
@@ -224,7 +226,8 @@ class PresentationController extends Controller
                     [
                         'id' => 1,
                         'title_ar' => $sectionTitle,
-                        'intonation_ar' => null,
+                        'intonation' => $intonation,
+                        'conclusion' => $conclusion,
                         'has_coptic' => $hasCoptic,
                         'lines' => $allLinesInOneReading,
                         'style' => 1,
@@ -233,6 +236,7 @@ class PresentationController extends Controller
             ];
         })->values();
 
+        //dd($sections);
         // ✅ Build slides
         $slides = [];
         foreach ($sections as $section) {
@@ -272,7 +276,8 @@ class PresentationController extends Controller
                 'section_code' => $section['code'],
                 'section_name' => $section['name_ar'],
                 'title' => $reading['title_ar'],
-                'intonation_ar' => null,
+                'intonation' => $reading['intonation']?? null,
+                'conclusion' => $reading['conclusion']?? null,
                 'lines' => $reading['lines'],
                 'has_coptic' => $reading['has_coptic'],
             ];

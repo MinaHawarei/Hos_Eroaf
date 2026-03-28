@@ -103,8 +103,8 @@ class PresentationSearchService
                     'section_code' => (string) $sectionKey,
                     'section_name' => $sectionName,
                     'title' => $reading['title_ar'] ?? $sectionName,
-                    'intonation_ar' => $reading['intonation_ar'] ?? null,
-                    'intonation_co' => $reading['intonation_co'] ?? null,
+                    'intonation' => $reading['intonation'] ?? null,
+                    'conclusion' => $reading['conclusion'] ?? null,
                     'lines' => $lines,
                     'has_coptic' => $hasCoptic,
                 ];
@@ -140,8 +140,8 @@ class PresentationSearchService
             return [
                 [
                     'title_ar' => $title,
-                    'intonation_ar' => null,
-                    'intonation_co' => null,
+                    'intonation' => null,
+                    'conclusion' => null,
                     'text_ar' => $body,
                     'text_co' => [],
                     'text_ar_co' => [],
@@ -199,8 +199,8 @@ class PresentationSearchService
                 'section_code' => $slug,
                 'section_name' => $title,
                 'title' => $title,
-                'intonation_ar' => null,
-                'intonation_co' => null,
+                'intonation' => null,
+                'conclusion' => null,
                 'lines' => $lines,
                 'has_coptic' => $hasCoptic,
             ];

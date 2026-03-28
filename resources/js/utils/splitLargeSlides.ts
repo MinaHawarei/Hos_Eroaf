@@ -20,7 +20,8 @@ interface Slide {
     id: string;
     section_code: string;
     section_name: string;
-    intonation_ar?: string | null;
+    intonation?: string | null;
+    conclusion?: string | null;
     title?: string;
     lines?: Line[];
     has_coptic?: boolean;
@@ -123,23 +124,27 @@ async function splitSingleSlide(
     // إنشاء شرائح جديدة من الصفحات
     const splitSlides: Slide[] = [];
 
-    pages.forEach((pageLines, index) => {
-        // إنشاء ID فريد للجزء
-        const partNumber = index + 1;
-        const newSlideId = `${slide.id}_p${partNumber}`;
+// ✅ بعد
+pages.forEach((pageLines, index) => {
+    const partNumber = index + 1;
+    const isFirst = index === 0;
+    const isLast = index === pages.length - 1;
+    const newSlideId = `${slide.id}_p${partNumber}`;
 
-        // إنشاء الشريحة الجديدة
-        const newSlide: Slide = {
-            ...slide,
-            id: newSlideId,
-            lines: pageLines,
-            title: pages.length > 1 && partNumber > 1
-                ? `${slide.title} (${partNumber}/${pages.length})`
-                : slide.title,
-        };
+    const newSlide: Slide = {
+        ...slide,
+        id: newSlideId,
+        lines: pageLines,
+        title: pages.length > 1 && partNumber > 1
+            ? `${slide.title} (${partNumber}/${pages.length})`
+            : slide.title,
+        // المقدمة فقط في أول جزء، الخاتمة فقط في آخر جزء
+        intonation: isFirst ? slide.intonation : null,
+        conclusion: isLast  ? slide.conclusion : null,
+    };
 
-        splitSlides.push(newSlide);
-    });
+    splitSlides.push(newSlide);
+});
 
     return splitSlides;
 }

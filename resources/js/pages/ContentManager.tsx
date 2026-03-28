@@ -198,7 +198,7 @@ function ReadingsForm({ content, onChange }: { content: any; onChange: (c: any) 
     };
 
     const addReading = () => {
-        const next = [...readings, { title_ar: '', intonation_ar: '', intonation_co: '', text_ar: [], text_ar_co: [] }];
+        const next = [...readings, { title_ar: '', intonation: '', conclusion: '', text_ar: [], text_ar_co: [] }];
         onChange({ ...content, [activeTab]: next });
     };
 
@@ -275,11 +275,11 @@ function ReadingsForm({ content, onChange }: { content: any; onChange: (c: any) 
                                 </div>
                                 <div>
                                     <label className="label-xs">اللحن (عربي)</label>
-                                    <input className="field-input !bg-white text-black" dir="rtl" value={r.intonation_ar || ''} onChange={e => setReading(rIdx, 'intonation_ar', e.target.value)} />
+                                    <input className="field-input !bg-white text-black" dir="rtl" value={r.intonation || ''} onChange={e => setReading(rIdx, 'intonation', e.target.value)} />
                                 </div>
                                 <div className="md:col-span-2">
                                     <label className="label-xs">اللحن (قبطي)</label>
-                                    <input className="field-input !bg-white text-black" dir="rtl" value={r.intonation_co || ''} onChange={e => setReading(rIdx, 'intonation_co', e.target.value)} />
+                                    <input className="field-input !bg-white text-black" dir="rtl" value={r.conclusion || ''} onChange={e => setReading(rIdx, 'conclusion', e.target.value)} />
                                 </div>
                             </div>
 

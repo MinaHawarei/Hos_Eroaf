@@ -32,7 +32,8 @@ interface Slide {
     id: string;
     section_code: string;
     section_name: string;
-    intonation_ar?: string | null;
+    intonation?: string | null;
+    conclusion?: string | null;
     title?: string;
     lines?: any[];
     has_coptic?: boolean;
@@ -54,6 +55,13 @@ const ZOOM_STORAGE_KEY = 'pres_zoom_scale';
 const ZOOM_STEP = 0.1;
 const ZOOM_MIN = 0.5;
 const ZOOM_MAX = 2;
+
+// الـ padding الثابت للـ main container (pt-4 pb-5 = 16px + 20px = 36px)
+// + مسافة إضافية للأمان تمنع أي اقتطاع
+const MAIN_PADDING_PX = 36 + 8;
+
+// ارتفاع شريط التنقل السفلي (h-24 = 96px)
+const NAV_BAR_HEIGHT_PX = 96;
 
 function readStoredZoom(): number {
     if (typeof window === 'undefined') {
@@ -81,7 +89,6 @@ export default function PresentationPage({
     const [highlightQuery, setHighlightQuery] = useState<string | undefined>(undefined);
     const [isSplitting, setIsSplitting] = useState(true);
     const [splitInfo, setSplitInfo] = useState<SplitResult | null>(null);
-    // تفضيلات الاختيار العالمية — key = مجموعة labels مع بعض (signature)، value = index
     const [altPreferences, setAltPreferences] = useState<Record<string, number>>({});
 
     const [baseFontSize] = useState(() => {
@@ -96,6 +103,11 @@ export default function PresentationPage({
 
     const readerRef = React.useRef<SplitViewReaderRef>(null);
     const readerSlotRef = useRef<HTMLDivElement>(null);
+
+    // ref لقياس ارتفاع الـ header (section name + intonation + ornament)
+    const slideHeaderRef = useRef<HTMLDivElement>(null);
+    const [slideHeaderHeight, setSlideHeaderHeight] = useState(0);
+
     const mainRef = useRef<HTMLElement>(null);
     const [readerSlotHeight, setReaderSlotHeight] = useState(400);
     const [readerNav, setReaderNav] = useState({
@@ -107,7 +119,33 @@ export default function PresentationPage({
 
     const effectiveFontSize = Math.round(baseFontSize * zoomScale);
 
-    // دالة معالجة وتقسيم الشرائح
+    // الارتفاع الفعلي المتاح للـ SplitViewReader بعد خصم كل العناصر الثابتة
+    // readerSlotHeight = الارتفاع الحقيقي للـ div الحاوي (يشمل header + content)
+    // نخصم منه: ارتفاع الـ header الفعلي + padding الـ main + شريط التنقل
+    const effectiveReaderHeight = Math.max(
+        200,
+        readerSlotHeight - slideHeaderHeight - MAIN_PADDING_PX - NAV_BAR_HEIGHT_PX
+    );
+
+    // قياس ارتفاع الـ header عند كل تغيير في الشريحة
+    useLayoutEffect(() => {
+        const el = slideHeaderRef.current;
+        if (!el) return;
+
+        const measure = () => {
+            const h = el.getBoundingClientRect().height;
+            if (h > 0) setSlideHeaderHeight(Math.ceil(h));
+        };
+
+        measure();
+
+        if (typeof ResizeObserver !== 'undefined') {
+            const ro = new ResizeObserver(measure);
+            ro.observe(el);
+            return () => ro.disconnect();
+        }
+    }, [deck, currentSlideIndex]);
+
     const processAndSplitSlides = useCallback(async () => {
         if (!slidesProp || slidesProp.length === 0) {
             setDeck([]);
@@ -118,7 +156,6 @@ export default function PresentationPage({
         setIsSplitting(true);
 
         try {
-            // إنشاء TextPaginator للقياسات الدقيقة
             const containerWidth = typeof window !== 'undefined'
                 ? Math.max(280, window.innerWidth - 64)
                 : 960;
@@ -137,10 +174,8 @@ export default function PresentationPage({
                     paginator.measureTripleColumnRowHeight(ar, copAr, cop),
             };
 
-            // استخدام ارتفاع الـ container الفعلي أو قيمة افتراضية
-            const availableHeight = Math.max(300, readerSlotHeight);
+            const availableHeight = Math.max(300, effectiveReaderHeight);
 
-            // تقسيم الشرائح الكبيرة
             const result = await splitLargeSlides(
                 slidesProp,
                 availableHeight,
@@ -151,11 +186,8 @@ export default function PresentationPage({
 
             setDeck(result.slides);
             setSplitInfo(result);
-
-            // تنظيف الـ paginator
             paginator.cleanup();
 
-            // تسجيل معلومات التقسيم في الكونسول للتطوير
             if (result.totalSplitSlides > result.totalOriginalSlides) {
                 console.log(
                     `تم تقسيم الشرائح: ${result.totalOriginalSlides} → ${result.totalSplitSlides} شريحة ` +
@@ -164,14 +196,12 @@ export default function PresentationPage({
             }
         } catch (error) {
             console.error('خطأ في تقسيم الشرائح:', error);
-            // في حالة الخطأ، استخدم الشرائح الأصلية
             setDeck(slidesProp);
         } finally {
             setIsSplitting(false);
         }
-    }, [slidesProp, effectiveFontSize, readerSlotHeight]);
+    }, [slidesProp, effectiveFontSize, effectiveReaderHeight]);
 
-    // تأثير لتقسيم الشرائح عند تغيير البيانات أو حجم الخط أو ارتفاع الحاوية
     useEffect(() => {
         processAndSplitSlides();
     }, [processAndSplitSlides]);
@@ -290,7 +320,6 @@ export default function PresentationPage({
         return () => window.removeEventListener('keydown', h);
     }, [toggleFullscreen]);
 
-    // شاشة التحميل أثناء تقسيم الشرائح
     if (isSplitting) {
         return (
             <div className="presentation-bg flex h-screen items-center justify-center p-8" dir="rtl">
@@ -363,6 +392,7 @@ export default function PresentationPage({
         >
             <Head title={`عرض - ${copticDate || 'القداس'}`} />
 
+            {/* ── Toolbar ── */}
             <div
                 className={`fixed top-0 left-0 right-15 z-30 p-3 md:p-4 transition-all duration-500 ${isFullscreen ? 'opacity-0 hover:opacity-100' : ''}`}
             >
@@ -445,27 +475,31 @@ export default function PresentationPage({
 
             <main
                 ref={mainRef}
-                // ضفنا pb-24 عشان النص ميستخباش ورا الأزرار العائمة تحت
-                className="flex min-h-0 flex-1 flex-col items-stretch justify-start overflow-hidden px-8 pt-4 pb-20 md:px-10 md:pt-5 md:pb-24"
+                className="flex min-h-0 flex-1 flex-col items-stretch justify-start overflow-hidden px-8 pt-4 pb-5 md:px-10 md:pt-5 md:pb-5"
             >
-                {/* محتوى الشريحة كما هو بدون تغيير */}
                 <div className="pres-slide-column flex min-h-0 w-full max-w-none flex-1 flex-col justify-start">
-                    <div className="flex w-full flex-shrink-0 flex-col items-center">
+
+                    {/*
+                     * ── Slide Header ──
+                     * هذا الـ div بيتقاس ارتفاعه بـ ResizeObserver
+                     * وبيتخصم من effectiveReaderHeight قبل ما يتبعت للـ SplitViewReader
+                     */}
+                    <div ref={slideHeaderRef} className="flex w-full flex-shrink-0 flex-col items-center">
                         <div className="slide-section-header pres-section-header-scale mb-3 text-center md:mb-4">
                             <span className="ornament" aria-hidden="true" />
                             <span>{currentSlide.section_name}</span>
                             <span className="ornament" aria-hidden="true" />
                         </div>
-                        {currentSlide.intonation_ar && (
-                            <div className="intonation-badge pres-intonation-scale mb-3 text-center md:mb-4">
-                                {currentSlide.intonation_ar}
-                            </div>
-                        )}
                         <div className="ornamental-rule mb-3 md:mb-4">
                             <span className="ornament-diamond" />
                         </div>
                     </div>
 
+                    {/*
+                     * ── Reader Slot ──
+                     * يقيس الارتفاع الكلي للمنطقة — لكن الـ SplitViewReader
+                     * يستلم effectiveReaderHeight المخصوم منه الـ header
+                     */}
                     <div
                         ref={readerSlotRef}
                         className="flex min-h-0 w-full flex-1 flex-col justify-center overflow-hidden"
@@ -491,7 +525,7 @@ export default function PresentationPage({
                                         hasCoptic={activeAlt?.has_coptic ?? false}
                                         justified={true}
                                         className="flex min-h-0 w-full min-w-0 flex-1 flex-col justify-center"
-                                        maxContentHeight={readerSlotHeight}
+                                        maxContentHeight={effectiveReaderHeight}
                                         fontSizePx={effectiveFontSize}
                                         highlightQuery={highlightQuery}
                                         onPaginationMetaChange={setReaderNav}
@@ -517,9 +551,11 @@ export default function PresentationPage({
                                 hasCoptic={currentSlide.has_coptic ?? false}
                                 justified={true}
                                 className="flex min-h-0 w-full min-w-0 flex-1 flex-col justify-center"
-                                maxContentHeight={readerSlotHeight}
+                                maxContentHeight={effectiveReaderHeight}
                                 fontSizePx={effectiveFontSize}
                                 highlightQuery={highlightQuery}
+                                intonation={currentSlide.intonation}
+                                conclusion={currentSlide.conclusion}
                                 onPaginationMetaChange={setReaderNav}
                             />
                         )}
@@ -527,16 +563,13 @@ export default function PresentationPage({
                 </div>
             </main>
 
-            {/* أزرار التقليب العائمة */}
+            {/* ── أزرار التقليب العائمة ── */}
             <div
-                // الحاوية الأساسية شفافة وبتاخد مساحة من تحت عشان تلقط الماوس
                 className="fixed bottom-0 left-0 right-0 z-30 flex h-24 items-end justify-center pb-6 pointer-events-none"
             >
                 <div
-                    // هنا الـ Hover والشفافية في وضعية الـ Fullscreen
-                    className={`flex items-center gap-3 pointer-events-auto pres-nav-controls rounded-full px-4 py-2 transition-all duration-500 ${
-                        isFullscreen ? 'opacity-0 hover:opacity-100' : 'opacity-100'
-                    }`}
+                    className={`flex items-center gap-3 pointer-events-auto pres-nav-controls rounded-full px-4 py-2 transition-all duration-500 ${isFullscreen ? 'opacity-0 hover:opacity-100' : 'opacity-100'
+                        }`}
                 >
                     <Button
                         size="icon"
@@ -563,16 +596,13 @@ export default function PresentationPage({
                     >
                         <ChevronLeft className="h-6 w-6 md:h-7 md:w-7" />
                     </Button>
-
                 </div>
             </div>
 
-            {/* أزرار التكبير والتصغير العائمة */}
+            {/* ── أزرار التكبير والتصغير العائمة ── */}
             <div
-                // ضفنا pointer-events-auto هنا عشان نقدر نضغط عليهم حتى لو الشفافية 0 وفي حالة الـ Hover بيظهروا
-                className={`fixed bottom-4 left-4 z-40 flex flex-col gap-2 pointer-events-auto transition-all duration-500 ${
-                    isFullscreen ? 'opacity-0 hover:opacity-100' : 'opacity-100'
-                }`}
+                className={`fixed bottom-4 left-4 z-40 flex flex-col gap-2 pointer-events-auto transition-all duration-500 ${isFullscreen ? 'opacity-0 hover:opacity-100' : 'opacity-100'
+                    }`}
             >
                 <Button
                     size="icon"

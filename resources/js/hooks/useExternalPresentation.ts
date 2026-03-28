@@ -139,9 +139,9 @@ function buildExternalHTML(): string {
             html += '</div>';
 
             // Intonation badge
-            if (slide.intonation_ar) {
+            if (slide.intonation) {
                 html += '<div class="intonation-badge mb-8" style="font-size:clamp(0.875rem,2vw,1.125rem)">';
-                html += escapeHTML(slide.intonation_ar);
+                html += escapeHTML(slide.intonation);
                 html += '</div>';
             }
 
