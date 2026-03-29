@@ -1,0 +1,47 @@
+{
+    "code": "thalath_awashy_kobar",
+    "title": "اشليل",
+    "style": 1,
+    "content": [
+        {
+            "speaker": "الكاهن",
+            "text_ar": [
+                "صل"
+            ],
+            "text_ar_co": [
+                "اشليل"
+            ],
+            "text_co": []
+        },
+        {
+            "speaker": "الشماس",
+            "text_ar": [
+                "للصلاة قفوا"
+            ],
+            "text_ar_co": [
+                "إيبى إبروس إفكى إستاثيتى"
+            ],
+            "text_co": []
+        },
+        {
+            "speaker": "الكاهن",
+            "text_ar": [
+                "السلام للكل"
+            ],
+            "text_ar_co": [
+                "إيرينى باسى"
+            ],
+            "text_co": []
+        },
+        {
+            "speaker": "الشعب",
+            "text_ar": [
+                "ولروحك أيضًا"
+            ],
+            "text_ar_co": [
+                "كيطو إبنيفماتى سو"
+            ],
+            "text_co": []
+        }
+    ]
+}
