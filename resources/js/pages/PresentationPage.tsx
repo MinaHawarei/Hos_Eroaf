@@ -103,6 +103,9 @@ export default function PresentationPage({
 
     const [zoomScale, setZoomScale] = useState(readStoredZoom);
 
+    // Presentation mode (affects slide segmentation height)
+    const [presentationMode, setPresentationMode] = useState<'normal' | 'chroma'>('normal');
+
     // Track current slide ID for index restoration after deck rebuild
     const currentSlideIdRef = useRef<string | null>(null);
 
@@ -179,7 +182,15 @@ export default function PresentationPage({
                     paginator.measureTripleColumnRowHeight(ar, copAr, cop),
             };
 
-            const availableHeight = Math.max(300, effectiveReaderHeight);
+            // Calculate segment height based on presentation mode
+            let availableHeight = Math.max(300, effectiveReaderHeight);
+            if (presentationMode === 'chroma') {
+                // Ensure text stays contained in the lower portion of the screen
+                const chromaConstraint = typeof window !== 'undefined'
+                    ? Math.max(250, window.innerHeight * 0.40)
+                    : 350;
+                availableHeight = Math.min(availableHeight, chromaConstraint);
+            }
 
             const result = await splitLargeSlides(
                 slidesProp,
@@ -205,7 +216,7 @@ export default function PresentationPage({
         } finally {
             setIsSplitting(false);
         }
-    }, [slidesProp, effectiveFontSize, effectiveReaderHeight]);
+    }, [slidesProp, effectiveFontSize, effectiveReaderHeight, presentationMode]);
 
     useEffect(() => {
         processAndSplitSlides();
@@ -336,10 +347,10 @@ export default function PresentationPage({
                 seasonLabel,
                 effectiveFontSize,
                 readerPageIndex: readerNav.pageIndex,
-                displayMode: 'default',
+                displayMode: presentationMode,
             });
         }
-    }, [currentSlideIndex, currentSlide, copticDate, seasonLabel, deck.length, effectiveFontSize, readerNav.pageIndex, broadcast, altPreferences]);
+    }, [currentSlideIndex, currentSlide, copticDate, seasonLabel, deck.length, effectiveFontSize, readerNav.pageIndex, broadcast, altPreferences, presentationMode]);
 
     useEffect(() => {
         const h = (e: KeyboardEvent) => {
@@ -362,7 +373,7 @@ export default function PresentationPage({
                 <Head title="جاري التحميل..." />
                 <div className="text-center heritage-surface rounded-2xl p-12 max-w-md">
                     <Loader2 className="h-16 w-16 text-primary/30 mx-auto mb-6 animate-spin" />
-                    <h1 className="text-2xl font-serif font-bold mb-4 text-foreground">جاري تجهيز العرض</h1>
+                    <h1 className="text-2xl pres-arabic-text font-bold mb-4 text-foreground">جاري تجهيز العرض</h1>
                     <p className="text-muted-foreground">يتم تقسيم الشرائح الكبيرة لتحسين العرض...</p>
                 </div>
             </div>
@@ -375,7 +386,7 @@ export default function PresentationPage({
                 <Head title="لا توجد قراءات" />
                 <div className="text-center heritage-surface rounded-2xl p-12 max-w-md">
                     <BookOpen className="h-16 w-16 text-primary/30 mx-auto mb-6" />
-                    <h1 className="text-2xl font-serif font-bold mb-4 text-foreground">لا توجد قراءات مسجلة لهذا اليوم</h1>
+                    <h1 className="text-2xl pres-arabic-text font-bold mb-4 text-foreground">لا توجد قراءات مسجلة لهذا اليوم</h1>
                     <p className="text-muted-foreground mb-8">لم يتم العثور على شرائح عرض لهذا التاريخ</p>
                     <Button onClick={() => router.visit('/')} className="rounded-full px-8">
                         العودة للرئيسية
@@ -465,6 +476,15 @@ export default function PresentationPage({
                             className="h-9 w-9 text-muted-foreground hover:text-foreground hover:bg-muted"
                         >
                             <Search className="h-4 w-4" />
+                        </Button>
+                        <Button
+                            variant={presentationMode === 'chroma' ? 'default' : 'ghost'}
+                            size="icon"
+                            onClick={() => setPresentationMode(p => p === 'normal' ? 'chroma' : 'normal')}
+                            title={`نمط التقسيم: ${presentationMode === 'chroma' ? 'بث مباشر (Chroma)' : 'عادي (Normal)'}`}
+                            className="h-9 w-9 text-muted-foreground hover:text-foreground hover:bg-muted relative"
+                        >
+                            {presentationMode === 'chroma' ? <Tv className="h-4 w-4" /> : <TvMinimalPlay className="h-4 w-4" />}
                         </Button>
                         <Button
                             variant="ghost"

@@ -60,16 +60,14 @@
 }
 
 @theme inline {
-    /* Main UI Font stack — Amiri for high-readability traditional Arabic */
+    /* Main UI Font stack — Enforce Arial for standard text */
     --font-sans:
-        'Amiri', 'Cairo', 'Merriweather',
-        ui-sans-serif, system-ui, -apple-system, sans-serif,
-        'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
-        'Noto Color Emoji';
+        'Arial', sans-serif,
+        ui-sans-serif, system-ui, -apple-system;
 
-    /* Reading font — Amiri for Arabic, with Coptic fallbacks */
+    /* Reading font — Arial for Arabic, with Coptic fallbacks */
     --font-reading:
-        'Amiri', 'Playfair Display', 'Noto Sans Coptic',
+        'Arial', 'Playfair Display', 'Noto Sans Coptic',
         serif;
 
     /* Coptic script font — local fonts only */

@@ -21,7 +21,7 @@ export default function MirrorComponent() {
     const [contentHeight, setContentHeight] = useState(400);
     const [headerHeight, setHeaderHeight] = useState(0);
 
-    // Enter fullscreen on first click
+    // Enter fullscreen on initialization (or first click if browser blocks auto)
     useEffect(() => {
         const enterFullscreen = () => {
             if (!document.fullscreenElement) {
@@ -29,14 +29,18 @@ export default function MirrorComponent() {
             }
             setInteractivityEnabled(false);
         };
-        
+
+        // Try immediately
+        enterFullscreen();
+
+        // Also bind to click as fallback
         document.addEventListener('click', enterFullscreen, { once: true });
-        
+
         const channel = new BroadcastChannel('presentation_sync');
         const handleBeforeUnload = () => {
             channel.postMessage({ type: 'MIRROR_CLOSED' });
         };
-        
+
         window.addEventListener('beforeunload', handleBeforeUnload);
 
         return () => {
@@ -89,16 +93,16 @@ export default function MirrorComponent() {
 
     if (!state || !state.currentSlide) {
         return (
-            <div 
-                className="presentation-bg flex h-screen w-screen items-center justify-center overflow-hidden" 
+            <div
+                className="presentation-bg flex h-screen w-screen items-center justify-center overflow-hidden"
                 style={{ cursor: interactivityEnabled ? 'default' : 'none' }}
             >
                 <Head title="Mirror Mode — Presentation" />
                 <div className="flex flex-col items-center gap-8 text-center p-6">
                     <div className="h-20 w-20 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
                     <p className="text-muted-foreground font-serif text-lg animate-pulse" dir="rtl">
-                        {interactivityEnabled 
-                            ? 'اضغط في أي مكان لتفعيل ملء الشاشة والبدء...' 
+                        {interactivityEnabled
+                            ? 'اضغط في أي مكان لتفعيل ملء الشاشة والبدء...'
                             : 'في انتظار بدء العرض من الشاشة الرئيسية...'}
                     </p>
                 </div>
@@ -107,7 +111,7 @@ export default function MirrorComponent() {
     }
 
     const { currentSlide, activeAlternativeIndex, effectiveFontSize, readerPageIndex, slideId } = state;
-    
+
     // Resolve the active alternative — only display the currently selected one
     let displayLines = currentSlide.lines || [];
     let displayHasCoptic = currentSlide.has_coptic || false;
@@ -126,17 +130,17 @@ export default function MirrorComponent() {
     }
 
     return (
-        <div 
-            className={`presentation-bg h-screen w-screen overflow-hidden select-none flex flex-col ${interactivityEnabled ? '' : 'pointer-events-none'}`} 
+        <div
+            className={`presentation-bg h-screen w-screen overflow-hidden select-none flex flex-col ${interactivityEnabled ? '' : 'pointer-events-none'}`}
             dir="rtl"
-            style={{ 
+            style={{
                 cursor: interactivityEnabled ? 'default' : 'none',
                 '--pres-font-size': `${effectiveFontSize}px`,
                 userSelect: 'none',
             } as React.CSSProperties}
         >
             <Head title="Mirror View — Presentation" />
-            
+
             <main className="flex h-full min-h-0 flex-1 flex-col items-center justify-start overflow-hidden px-8 pt-4 pb-5 md:px-10 md:pt-5 md:pb-5">
                 <div className="pres-slide-column flex min-h-0 w-full max-w-none flex-1 flex-col justify-start">
                     {/* Slide Header — mirrors the main presentation exactly */}

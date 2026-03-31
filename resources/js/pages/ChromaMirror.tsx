@@ -25,7 +25,7 @@ export default function ChromaMirror() {
     const containerRef = useRef<HTMLDivElement>(null);
     const [containerHeight, setContainerHeight] = useState(400);
 
-    // Enter fullscreen on first click
+    // Enter fullscreen on initialization (or first click if browser blocks auto)
     useEffect(() => {
         const enterFullscreen = () => {
             if (!document.fullscreenElement) {
@@ -34,6 +34,10 @@ export default function ChromaMirror() {
             setInteractivityEnabled(false);
         };
 
+        // Try immediately
+        enterFullscreen();
+
+        // Also bind to click as fallback
         document.addEventListener('click', enterFullscreen, { once: true });
 
         const channel = new BroadcastChannel('presentation_sync');
@@ -118,11 +122,8 @@ export default function ChromaMirror() {
         }
     }
 
-    // Filter only Arabic lines for chroma (broadcast-friendly)
-    const arabicOnlyLines = displayLines.filter(
-        (l: any) => l.lang_type === 'arabic' || l.lang_type === 'coptic_arabized'
-    );
-    const finalLines = arabicOnlyLines.length > 0 ? arabicOnlyLines : displayLines;
+    // Use all lines according to mode logic
+    const finalLines = displayLines;
 
     // Max height for text — bottom 40% of the safe area for lower-thirds
     const textMaxHeight = Math.max(200, containerHeight * 0.45);

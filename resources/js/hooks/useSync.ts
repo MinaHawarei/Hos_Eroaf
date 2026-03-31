@@ -2,7 +2,7 @@ import { useEffect, useCallback, useState, useRef } from 'react';
 
 const CHANNEL_NAME = 'presentation_sync';
 
-export type DisplayMode = 'default' | 'chroma';
+export type DisplayMode = 'normal' | 'chroma';
 
 export interface SyncState {
     slideId: string;
@@ -69,23 +69,60 @@ export function useSync(mode: 'source' | 'receiver' = 'source') {
         }
     }, [mode]);
 
-    const openMirrorWindow = useCallback(() => {
-        const width = window.screen.availWidth;
-        const height = window.screen.availHeight;
-        const features = `width=${width},height=${height},top=0,left=${window.screen.width},menubar=no,toolbar=no,location=no,status=no,scrollbars=no,resizable=yes`;
+    const openMirrorWindow = useCallback(async () => {
+        let left = window.screen.width;
+        let top = 0;
+        let width = window.screen.availWidth;
+        let height = window.screen.availHeight;
 
+        try {
+            if ('getScreenDetails' in window) {
+                const screenDetails = await (window as any).getScreenDetails();
+                // Find a screen that is NOT the current screen
+                const externalScreen = screenDetails.screens.find(
+                    (s: any) => s !== screenDetails.currentScreen
+                );
+                if (externalScreen) {
+                    left = externalScreen.availLeft;
+                    top = externalScreen.availTop;
+                    width = externalScreen.availWidth;
+                    height = externalScreen.availHeight;
+                }
+            }
+        } catch (e) {
+            console.warn('Could not get screen details for multi-display placement:', e);
+        }
+
+        const features = `width=${width},height=${height},top=${top},left=${left},menubar=no,toolbar=no,location=no,status=no,scrollbars=no,resizable=yes`;
         const mirrorUrl = (window as any).route ? (window as any).route('mirror') : '/presentation/mirror';
-
         return window.open(mirrorUrl, `hos-erof-mirror-${Date.now()}`, features);
     }, []);
 
-    const openChromaWindow = useCallback(() => {
-        const width = window.screen.availWidth;
-        const height = window.screen.availHeight;
-        const features = `width=${width},height=${height},top=0,left=${window.screen.width},menubar=no,toolbar=no,location=no,status=no,scrollbars=no,resizable=yes`;
+    const openChromaWindow = useCallback(async () => {
+        let left = window.screen.width;
+        let top = 0;
+        let width = window.screen.availWidth;
+        let height = window.screen.availHeight;
 
+        try {
+            if ('getScreenDetails' in window) {
+                const screenDetails = await (window as any).getScreenDetails();
+                const externalScreen = screenDetails.screens.find(
+                    (s: any) => s !== screenDetails.currentScreen
+                );
+                if (externalScreen) {
+                    left = externalScreen.availLeft;
+                    top = externalScreen.availTop;
+                    width = externalScreen.availWidth;
+                    height = externalScreen.availHeight;
+                }
+            }
+        } catch (e) {
+            console.warn('Could not get screen details for chroma display placement:', e);
+        }
+
+        const features = `width=${width},height=${height},top=${top},left=${left},menubar=no,toolbar=no,location=no,status=no,scrollbars=no,resizable=yes`;
         const chromaUrl = (window as any).route ? (window as any).route('croma') : '/presentation/croma';
-
         return window.open(chromaUrl, `hos-erof-chroma-${Date.now()}`, features);
     }, []);
 
