@@ -295,6 +295,10 @@ class PresentationController extends Controller
     {
         return Inertia::render('MirrorComponent');
     }
+    public function croma_mirror()
+    {
+        return Inertia::render('ChromaMirror');
+    }
 
     public function search(Request $request, PresentationSearchService $presentationSearchService): JsonResponse
     {

@@ -4,6 +4,12 @@
  */
 export const PRES_BODY_LEADING_CLASS = 'leading-[1.55]';
 
+/** CSS class for Coptic script text — applies local Coptic fonts */
+export const COPTIC_FONT_CLASS = 'pres-coptic-text';
+
+/** CSS class for Arabic reading text — applies Amiri/reading fonts */
+export const ARABIC_FONT_CLASS = 'pres-arabic-text';
+
 /** Matches SplitViewReader vertical spacing between row blocks (`space-y-3`). */
 export const PRES_ROW_BLOCK_STACK_GAP_PX = 12;
 

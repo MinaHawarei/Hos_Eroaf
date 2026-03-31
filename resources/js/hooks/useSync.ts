@@ -2,6 +2,8 @@ import { useEffect, useCallback, useState, useRef } from 'react';
 
 const CHANNEL_NAME = 'presentation_sync';
 
+export type DisplayMode = 'default' | 'chroma';
+
 export interface SyncState {
     slideId: string;
     currentSlide: any;
@@ -13,6 +15,7 @@ export interface SyncState {
     effectiveFontSize: number;
     zoomScale?: number;
     readerPageIndex: number;
+    displayMode: DisplayMode;
     timestamp: number;
 }
 
@@ -76,11 +79,22 @@ export function useSync(mode: 'source' | 'receiver' = 'source') {
         return window.open(mirrorUrl, `hos-erof-mirror-${Date.now()}`, features);
     }, []);
 
+    const openChromaWindow = useCallback(() => {
+        const width = window.screen.availWidth;
+        const height = window.screen.availHeight;
+        const features = `width=${width},height=${height},top=0,left=${window.screen.width},menubar=no,toolbar=no,location=no,status=no,scrollbars=no,resizable=yes`;
+
+        const chromaUrl = (window as any).route ? (window as any).route('croma') : '/presentation/croma';
+
+        return window.open(chromaUrl, `hos-erof-chroma-${Date.now()}`, features);
+    }, []);
+
     return { 
         state, 
         broadcast, 
         closeMirrors, 
         openMirrorWindow,
+        openChromaWindow,
         mirrorCount,
         hasMirrors: mirrorCount > 0
     };

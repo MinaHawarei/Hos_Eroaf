@@ -1,12 +1,27 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useLayoutEffect, useMemo, useCallback } from 'react';
 import { Head } from '@inertiajs/react';
 import { useSync } from '@/hooks/useSync';
 import { SplitViewReader } from '@/components/SplitViewReader';
 
+/**
+ * MirrorComponent — Synchronized mirror display that replicates
+ * the active presentation state exactly.
+ *
+ * Features:
+ * - Fully mirrors the main presentation's current slide
+ * - Correctly displays alternatives (only the active one)
+ * - Dynamic layout with ResizeObserver for proper text fitting
+ * - Matches transitions and layout logic from the main view
+ */
 export default function MirrorComponent() {
     const { state } = useSync('receiver');
     const [interactivityEnabled, setInteractivityEnabled] = useState(true);
+    const contentRef = useRef<HTMLDivElement>(null);
+    const headerRef = useRef<HTMLDivElement>(null);
+    const [contentHeight, setContentHeight] = useState(400);
+    const [headerHeight, setHeaderHeight] = useState(0);
 
+    // Enter fullscreen on first click
     useEffect(() => {
         const enterFullscreen = () => {
             if (!document.fullscreenElement) {
@@ -31,6 +46,47 @@ export default function MirrorComponent() {
         };
     }, []);
 
+    // Measure content area height dynamically
+    useLayoutEffect(() => {
+        const el = contentRef.current;
+        if (!el || typeof ResizeObserver === 'undefined') return;
+
+        const ro = new ResizeObserver((entries) => {
+            const h = entries[0]?.contentRect.height;
+            if (h && h > 0) {
+                setContentHeight(Math.floor(h));
+            }
+        });
+        ro.observe(el);
+        setContentHeight(Math.floor(el.getBoundingClientRect().height) || 400);
+        return () => ro.disconnect();
+    }, []);
+
+    // Measure header height dynamically
+    useLayoutEffect(() => {
+        const el = headerRef.current;
+        if (!el) return;
+
+        const measure = () => {
+            const h = el.getBoundingClientRect().height;
+            if (h > 0) setHeaderHeight(Math.ceil(h));
+        };
+
+        measure();
+
+        if (typeof ResizeObserver !== 'undefined') {
+            const ro = new ResizeObserver(measure);
+            ro.observe(el);
+            return () => ro.disconnect();
+        }
+    }, [state?.slideId]);
+
+    // Compute effective reader height (matching PresentationPage logic)
+    const effectiveReaderHeight = useMemo(() => {
+        const PADDING = 44; // top + bottom padding + safety margin
+        return Math.max(200, contentHeight - headerHeight - PADDING);
+    }, [contentHeight, headerHeight]);
+
     if (!state || !state.currentSlide) {
         return (
             <div 
@@ -50,20 +106,28 @@ export default function MirrorComponent() {
         );
     }
 
-    const { currentSlide, activeAlternativeIndex, effectiveFontSize, readerPageIndex, slideId, timestamp } = state;
+    const { currentSlide, activeAlternativeIndex, effectiveFontSize, readerPageIndex, slideId } = state;
     
-    // Resolve which alternative to render specifically forcing the received index
-    let alternativeToRender = null;
-    if (currentSlide.has_alternatives && currentSlide.alternatives) {
-        alternativeToRender = currentSlide.alternatives[activeAlternativeIndex];
-    }
+    // Resolve the active alternative — only display the currently selected one
+    let displayLines = currentSlide.lines || [];
+    let displayHasCoptic = currentSlide.has_coptic || false;
+    let displayIntonation = currentSlide.intonation || null;
+    let displayConclusion = currentSlide.conclusion || null;
 
-    const displayLines = alternativeToRender ? alternativeToRender.lines : (currentSlide.lines || []);
-    const displayHasCoptic = alternativeToRender ? alternativeToRender.has_coptic : (currentSlide.has_coptic || false);
+    if (currentSlide.has_alternatives && currentSlide.alternatives) {
+        const activeAlt = currentSlide.alternatives[activeAlternativeIndex];
+        if (activeAlt) {
+            displayLines = activeAlt.lines || [];
+            displayHasCoptic = activeAlt.has_coptic || false;
+            // Alternatives typically don't have separate intonation/conclusion
+            displayIntonation = null;
+            displayConclusion = null;
+        }
+    }
 
     return (
         <div 
-            className={`presentation-bg h-screen w-screen overflow-hidden select-none p-10 md:p-16 lg:p-20 ${interactivityEnabled ? '' : 'pointer-events-none'}`} 
+            className={`presentation-bg h-screen w-screen overflow-hidden select-none flex flex-col ${interactivityEnabled ? '' : 'pointer-events-none'}`} 
             dir="rtl"
             style={{ 
                 cursor: interactivityEnabled ? 'default' : 'none',
@@ -73,27 +137,35 @@ export default function MirrorComponent() {
         >
             <Head title="Mirror View — Presentation" />
             
-            <main className="flex h-full flex-col items-center justify-center">
-                 {/* Slide Header Context */}
-                 <div className="flex w-full flex-shrink-0 flex-col items-center">
-                    <div className="slide-section-header pres-section-header-scale mb-4 text-center">
-                        <span className="ornament" aria-hidden="true" />
-                        <span>{currentSlide.section_name}</span>
-                        <span className="ornament" aria-hidden="true" />
+            <main className="flex h-full min-h-0 flex-1 flex-col items-center justify-start overflow-hidden px-8 pt-4 pb-5 md:px-10 md:pt-5 md:pb-5">
+                <div className="pres-slide-column flex min-h-0 w-full max-w-none flex-1 flex-col justify-start">
+                    {/* Slide Header — mirrors the main presentation exactly */}
+                    <div ref={headerRef} className="flex w-full flex-shrink-0 flex-col items-center">
+                        <div className="slide-section-header pres-section-header-scale mb-3 text-center md:mb-4">
+                            <span className="ornament" aria-hidden="true" />
+                            <span>{currentSlide.section_name}</span>
+                            <span className="ornament" aria-hidden="true" />
+                        </div>
+                        <div className="ornamental-rule mb-3 md:mb-4">
+                            <span className="ornament-diamond" />
+                        </div>
                     </div>
-                </div>
 
-                <div className="flex w-full flex-1 flex-col justify-center overflow-hidden">
-                    <SplitViewReader
-                        key={`${slideId}-${activeAlternativeIndex}`}
-                        initialPage={readerPageIndex ?? 0}
-                        lines={displayLines}
-                        hasCoptic={displayHasCoptic}
-                        justified={true}
-                        className="flex min-h-0 w-full min-w-0 flex-1 flex-col justify-center"
-                        fontSizePx={effectiveFontSize ?? 28}
-                        maxContentHeight={typeof window !== 'undefined' ? window.innerHeight - 350 : 800}
-                    />
+                    {/* Reader Content — dynamic height matching */}
+                    <div ref={contentRef} className="flex min-h-0 w-full flex-1 flex-col justify-center overflow-hidden">
+                        <SplitViewReader
+                            key={`mirror-${slideId}-${activeAlternativeIndex}`}
+                            initialPage={readerPageIndex ?? 0}
+                            lines={displayLines}
+                            hasCoptic={displayHasCoptic}
+                            justified={true}
+                            className="flex min-h-0 w-full min-w-0 flex-1 flex-col justify-center"
+                            fontSizePx={effectiveFontSize ?? 28}
+                            maxContentHeight={effectiveReaderHeight}
+                            intonation={displayIntonation}
+                            conclusion={displayConclusion}
+                        />
+                    </div>
                 </div>
             </main>
         </div>

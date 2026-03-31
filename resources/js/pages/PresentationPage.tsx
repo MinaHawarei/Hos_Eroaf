@@ -22,6 +22,8 @@ import {
     Minus,
     RotateCcw,
     Loader2,
+    Tv,
+    TvMinimalPlay
 } from 'lucide-react';
 import Cookies from 'js-cookie';
 
@@ -100,6 +102,9 @@ export default function PresentationPage({
     });
 
     const [zoomScale, setZoomScale] = useState(readStoredZoom);
+
+    // Track current slide ID for index restoration after deck rebuild
+    const currentSlideIdRef = useRef<string | null>(null);
 
     const readerRef = React.useRef<SplitViewReaderRef>(null);
     const readerSlotRef = useRef<HTMLDivElement>(null);
@@ -206,8 +211,31 @@ export default function PresentationPage({
         processAndSplitSlides();
     }, [processAndSplitSlides]);
 
+    // Restore slide index after deck rebuild (fixes zoom reset bug)
     useEffect(() => {
-        setCurrentSlideIndex(0);
+        if (!deck || deck.length === 0) return;
+        const savedId = currentSlideIdRef.current;
+        if (!savedId) {
+            // First load — start at 0
+            setCurrentSlideIndex(0);
+            currentSlideIdRef.current = deck[0]?.id ?? null;
+            return;
+        }
+        // Try to find the same slide (or closest match by section_code prefix)
+        const exactIdx = deck.findIndex(s => s.id === savedId);
+        if (exactIdx !== -1) {
+            setCurrentSlideIndex(exactIdx);
+            return;
+        }
+        // Fallback: find slide with same section_code prefix
+        const prefix = savedId.split('-').slice(0, 2).join('-');
+        const prefixIdx = deck.findIndex(s => s.id.startsWith(prefix));
+        if (prefixIdx !== -1) {
+            setCurrentSlideIndex(prev => Math.min(prev, deck.length - 1));
+            return;
+        }
+        // Last resort: clamp to valid range
+        setCurrentSlideIndex(prev => Math.min(prev, deck.length - 1));
     }, [deck]);
 
     useEffect(() => {
@@ -276,10 +304,17 @@ export default function PresentationPage({
         handlePrevSlide
     );
 
-    const { broadcast, openMirrorWindow, closeMirrors, mirrorCount, hasMirrors } =
+    const { broadcast, openMirrorWindow, openChromaWindow, closeMirrors, mirrorCount, hasMirrors } =
         useSync('source');
 
     const currentSlide = deck?.[currentSlideIndex];
+
+    // Keep the ref in sync with current slide
+    useEffect(() => {
+        if (currentSlide?.id) {
+            currentSlideIdRef.current = currentSlide.id;
+        }
+    }, [currentSlide?.id]);
 
     useEffect(() => {
         setHighlightQuery(undefined);
@@ -301,6 +336,7 @@ export default function PresentationPage({
                 seasonLabel,
                 effectiveFontSize,
                 readerPageIndex: readerNav.pageIndex,
+                displayMode: 'default',
             });
         }
     }, [currentSlideIndex, currentSlide, copticDate, seasonLabel, deck.length, effectiveFontSize, readerNav.pageIndex, broadcast, altPreferences]);
@@ -443,6 +479,15 @@ export default function PresentationPage({
                                     {mirrorCount}
                                 </span>
                             )}
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={openChromaWindow}
+                            title="فتح شاشة كروما (بث مباشر)"
+                            className="h-9 w-9 text-muted-foreground hover:text-foreground hover:bg-muted relative"
+                        >
+                            <Tv className="h-4 w-4" />
                         </Button>
                         <Button
                             variant="ghost"

@@ -41,6 +41,7 @@ export interface SplitViewReaderProps {
     initialPage?: number;
     intonation?: string | null;
     conclusion?: string | null;
+    chromaMode?: boolean;
     onPaginationMetaChange?: (meta: {
         isFirstPage: boolean;
         isLastPage: boolean;
@@ -73,11 +74,15 @@ const rowGapClass = 'gap-3 md:gap-4';
 function bodyParagraphClassNames(
     justified: boolean,
     extra?: string,
-    isRtl: boolean = true
+    isRtl: boolean = true,
+    isCopticScript: boolean = false,
+    isChroma: boolean = false
 ): string {
     return cn(
-        'pres-slide-body-text font-reading font-bold break-words text-center',
+        'pres-slide-body-text font-bold break-words text-center',
+        isCopticScript ? 'pres-coptic-text' : 'font-reading pres-arabic-text',
         PRES_BODY_LEADING_CLASS,
+        isChroma && 'text-white',
         extra
     );
 }
@@ -95,6 +100,7 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
             initialPage = 0,
             intonation,
             conclusion,
+            chromaMode = false,
             onPaginationMetaChange,
         },
         ref
@@ -302,16 +308,23 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
                     {currentLines.map((line, index) => {
                         const prevSpeaker = index > 0 ? currentLines[index - 1].speaker : null;
                         const shouldShowSpeaker = line.speaker && line.speaker !== prevSpeaker;
+                        const isCopticScript = line.lang_type === 'coptic';
 
                         return (
                             <div
                                 key={`${currentPage}-${line.id}-${index}`}
                                 className="animate-in fade-in slide-in-from-bottom-2 flex flex-col space-y-2 duration-500"
                             >
-                                {shouldShowSpeaker && line.speaker && renderSpeakerBar(line.speaker, true)}
+                                {shouldShowSpeaker && line.speaker && !chromaMode && renderSpeakerBar(line.speaker, true)}
                                 <p
-                                    className={bodyParagraphClassNames(justified, 'text-foreground')}
-                                    dir="rtl"
+                                    className={bodyParagraphClassNames(
+                                        justified,
+                                        chromaMode ? 'text-white' : 'text-foreground',
+                                        true,
+                                        isCopticScript,
+                                        chromaMode
+                                    )}
+                                    dir={isCopticScript ? 'ltr' : 'rtl'}
                                     dangerouslySetInnerHTML={lineHtml(line, highlightQuery)}
                                 />
                             </div>
@@ -407,7 +420,13 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
                                         )}
                                     >
                                         <p
-                                            className={bodyParagraphClassNames(justified, 'text-foreground')}
+                                            className={bodyParagraphClassNames(
+                                                justified,
+                                                chromaMode ? 'text-white' : 'text-foreground',
+                                                true,
+                                                false,
+                                                chromaMode
+                                            )}
                                             dir="rtl"
                                             dangerouslySetInnerHTML={lineHtml(ar, highlightQuery)}
                                         />
@@ -431,7 +450,12 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
                                         <p
                                             className={bodyParagraphClassNames(
                                                 justified,
-                                                '!text-[#880808] dark:!text-sky-400 break-words'
+                                                chromaMode
+                                                    ? 'text-white/90'
+                                                    : '!text-[#880808] dark:!text-sky-400 break-words',
+                                                true,
+                                                false,
+                                                chromaMode
                                             )}
                                             dir="rtl"
                                             dangerouslySetInnerHTML={lineHtml(arcop, highlightQuery)}
@@ -451,8 +475,10 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
                                         <p
                                             className={bodyParagraphClassNames(
                                                 justified,
-                                                'text-foreground',
-                                                false
+                                                chromaMode ? 'text-white/80' : 'text-foreground',
+                                                false,
+                                                true,
+                                                chromaMode
                                             )}
                                             dir="ltr"
                                             dangerouslySetInnerHTML={lineHtml(cop, highlightQuery)}

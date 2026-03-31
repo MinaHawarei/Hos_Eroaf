@@ -7,18 +7,75 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* ===========================
+ * LOCAL FONT DECLARATIONS
+ * Coptic fonts from resources/Fonts
+ * =========================== */
+@font-face {
+    font-family: 'CS Avva Shenouda';
+    src: url('/fonts/CS Avva Shenouda.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'CS New Athanasius';
+    src: url('/fonts/CS New Athanasius.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Abraam';
+    src: url('/fonts/Abraam.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Athanasius';
+    src: url('/fonts/Athanasius.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Avva Marcos';
+    src: url('/fonts/Avva Marcos Normal.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Avva Shenouda';
+    src: url('/fonts/Avva_Shenouda.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
 @theme inline {
-    /* Main UI Font stack (Cairo/Merriweather) */
+    /* Main UI Font stack — Amiri for high-readability traditional Arabic */
     --font-sans:
-        'Cairo', 'Merriweather',
+        'Amiri', 'Cairo', 'Merriweather',
         ui-sans-serif, system-ui, -apple-system, sans-serif,
         'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
         'Noto Color Emoji';
 
-    /* Decorative Coptic/reading font (Amiri/Playfair Display) */
+    /* Reading font — Amiri for Arabic, with Coptic fallbacks */
     --font-reading:
         'Amiri', 'Playfair Display', 'Noto Sans Coptic',
         serif;
+
+    /* Coptic script font — local fonts only */
+    --font-coptic:
+        'CS New Athanasius', 'Athanasius', 'CS Avva Shenouda',
+        'Avva Marcos', 'Noto Sans Coptic', serif;
 
     --font-serif:
         'Playfair Display', 'Amiri', serif;
@@ -472,13 +529,31 @@
     font-size: var(--pres-font-size, 28px);
 }
 
+/* Typography: Arabic reading text — high readability at large scales */
+.pres-arabic-text {
+    font-family: var(--font-reading);
+    line-height: 1.75;
+    letter-spacing: 0.01em;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* Typography: Coptic script text */
+.pres-coptic-text {
+    font-family: var(--font-coptic);
+    line-height: 1.8;
+    letter-spacing: 0.02em;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
 /* Justified blocks: Enhanced for Arabic with inter-word justification and proper spacing */
 .pres-arabic-justify {
     text-align: justify;
     text-justify: inter-word;
     text-align-last: start;
     word-spacing: -0.01em;
-    line-height: 1.65;
+    line-height: 1.75;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
 }
@@ -652,4 +727,85 @@
             rgba(18, 18, 18, 0.6) 100%);
     border-color: rgba(59, 51, 43, 0.5);
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.02);
+}
+
+/* =========================================
+ *  CHROMA MODE — Broadcast-ready display
+ * ========================================= */
+
+/* Green chroma key background */
+.chroma-bg {
+    position: relative;
+    background-color: #00b140;
+    min-height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+}
+
+.chroma-bg::before {
+    display: none;
+}
+
+/* TV-safe margins (10% action safe area) */
+.chroma-safe-area {
+    position: absolute;
+    inset: 5%;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    align-items: center;
+}
+
+/* Semi-transparent text container for chroma readability */
+.chroma-text-container {
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border-radius: 1rem;
+    padding: 1.5rem 2.5rem;
+    width: 100%;
+    max-width: 90%;
+    color: #ffffff;
+}
+
+/* Chroma logo animation */
+@keyframes chromaLogoFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes chromaLogoFadeOut {
+    from {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(-10px) scale(0.95);
+    }
+}
+
+.chroma-logo-enter {
+    animation: chromaLogoFadeIn 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.chroma-logo-exit {
+    animation: chromaLogoFadeOut 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Continuous paragraph rendering — no visual breaks between lines */
+.pres-paragraph-continuous {
+    display: block;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.pres-paragraph-continuous .pres-line {
+    display: inline;
 }

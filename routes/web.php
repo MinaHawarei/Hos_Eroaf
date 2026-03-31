@@ -19,6 +19,7 @@ Route::prefix('presentation')->group(function () {
 
     // Mirror Mode — synchronized display
     Route::get('/mirror', [PresentationController::class, 'mirror'])->name('mirror');
+    Route::get('/croma', [PresentationController::class, 'croma_mirror'])->name('croma');
 
     Route::get('/{dayKey}', [PresentationController::class, 'lectionary'])->name('presentation.show');
 });
