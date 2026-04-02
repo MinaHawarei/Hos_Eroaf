@@ -1,16 +1,25 @@
 /**
- * SearchService handles diacritic-insensitive (Tashkeel) Arabic search.
- * It strictly ignores diacritics and normalizes Alef variations and Teh Marbutas.
+ * SearchService
+ * 
+ * Provides utilities for diacritic-insensitive (Tashkeel) Arabic search.
+ * It normalizes orthographic variations (Alef types, Teh Marbuta vs Heh, 
+ * Alef Maksura vs Yeh) and strips all diacritics to ensure a robust 'fuzzy' 
+ * matching experience for liturgical content.
  */
 
 export class SearchService {
     /**
-     * Normalizes an Arabic string for search comparison.
-     * Actions performed:
-     * 1. Strip all Tashkeel (Arabic diacritics).
-     * 2. Unify Alef forms (أ, إ, آ, ا) to bare Alef (ا).
+     * Normalizes an Arabic string for search comparison by stripping diacritics 
+     * and unifying similar-looking characters.
+     * 
+     * Normalization rules:
+     * 1. Strip Tashkeel (Range \u064B to \u065F) and Kashida (\u0640).
+     * 2. Unify all Alef forms (أ, إ, آ, ا) to a bare Alef (ا).
      * 3. Unify Teh Marbuta (ة) to Heh (ه).
      * 4. Unify Alef Maksura (ى) to Yeh (ي).
+     * 
+     * @param str - The raw Arabic string.
+     * @returns The normalized, simplified string for comparison.
      */
     public static normalizeArabic(str: string): string {
         if (!str) return '';
@@ -34,7 +43,11 @@ export class SearchService {
     }
 
     /**
-     * Checks if the query matches the content.
+     * Checks if a search query matches a piece of content, ignoring Arabic diacritics.
+     * 
+     * @param query - The user's input.
+     * @param content - The original text to search within.
+     * @returns True if a match is found.
      */
     public static isMatch(query: string, content: string): boolean {
         const normQuery = this.normalizeArabic(query);
@@ -45,8 +58,17 @@ export class SearchService {
     }
 
     /**
-     * Surrounds the matched portion of the ORIGINAL text with a highlight tag.
-     * Retains original Tashkeel visually.
+     * Highlights search matches within the ORIGINAL text, preserving all original 
+     * diacritics and formatting visually.
+     * 
+     * Mechanism:
+     * It constructs a complex regular expression that inserts an optional diacritic 
+     * matcher between every character of the query. This allows the search to 
+     * 'skip over' diacritics in the original text.
+     * 
+     * @param query - The normalized search query.
+     * @param originalText - The raw text with diacritics.
+     * @returns HTML string with <mark> tags around matches.
      */
     public static highlightMatch(query: string, originalText: string): string {
         if (!query.trim() || !originalText) return originalText;

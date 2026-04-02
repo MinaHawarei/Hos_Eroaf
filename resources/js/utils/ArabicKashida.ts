@@ -3,18 +3,22 @@
  * to elongate words and improve text aesthetics.
  */
 
-// Characters that can connect to the next character (thus can have a kashida after them)
-// Includes letters that are not the "stubborn" ones (ا د ذ ر ز و)
+// Arabic characters that can connect to the following letter (thus a kashida/tatweel can be inserted after them)
+// Excludes 'stubborn' letters that never connect to the left (ا د ذ ر ز و)
 const CONNECTING_CHARS = /[بتثجحخسشصضطظعغفقكلمنهي]/;
 
-// Points where we should NOT insert a kashida:
-// 1. After Alef, Dal, Thal, Ra, Zain, Waw (non-connecting)
-// 2. At the end of a word
-// 3. After a character that's already a kashida
+// Characters that do NOT connect to the next letter or are special cases:
+// 1. Alef, Dal, Thal, Ra, Zain, Waw (non-connecting to the left)
+// 2. Hamza variations that are typically terminal or isolated
 const NON_CONNECTING = /[ادذرزوؤإأآةء]/;
 
 /**
- * Deterministically adds kashida characters to Arabic text.
+ * Deterministically adds Arabic Kashida (Tatweel) characters to elongate words.
+ * This improves the visual 'fullness' and aesthetics of justified Arabic text.
+ * 
+ * @param text - The Arabic string to process.
+ * @param amount - Number of kashida characters (ـ) to insert at each valid point.
+ * @returns The elongated Arabic string.
  */
 export function applyKashida(text: string, amount: number = 2): string {
     if (!text || !/[\u0600-\u06FF]/.test(text)) return text; // Skip if no Arabic chars

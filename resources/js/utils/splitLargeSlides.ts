@@ -1,5 +1,5 @@
 import { TextPaginator } from './TextPaginator';
-import { computeSlidePages } from './computeSlidePages';
+import { computeSlidePages, groupIntoIntegratedRows, flattenIntegratedRows } from './computeSlidePages';
 import {
     resolveMultiColumnMode,
     paginationTolerancePx,
@@ -28,16 +28,32 @@ interface Slide {
     has_alternatives?: boolean;
 }
 
-// ✅ تأكد من تصدير هذه الواجهة
+/**
+ * Result of the slide splitting process.
+ */
 export interface SplitResult {
+    /** The new flattened array of slides (original small slides + sub-parts of large slides) */
     slides: Slide[];
+    /** Number of slides before splitting */
     totalOriginalSlides: number;
+    /** Total number of slides after splitting */
     totalSplitSlides: number;
-    splitMap: Map<string, string[]>; // خريطة لتتبع العلاقة بين الشرائح الأصلية والمقسمة
+    /** Map tracking which sub-slide IDs belong to which original slide ID */
+    splitMap: Map<string, string[]>;
 }
 
 /**
- * تقسيم الشرائح الكبيرة إلى شرائح متعددة
+ * Iterates through a list of liturgical slides and splits any that exceed the
+ * maximum allowable height into multiple sub-slides.
+ *
+ * This function now uses integrated row logic to ensure Arabic, Coptic Arabized,
+ * and Coptic Script texts stay together during the splitting process.
+ *
+ * @param slides - The original array of slides.
+ * @param maxHeightPx - Maximum height of the presentation area.
+ * @param fontSizePx - Current font size (affects measurement).
+ * @param containerWidthPx - Width of the presentation container.
+ * @param measureAdapter - The TextPaginator instance for DOM measurement.
  */
 export async function splitLargeSlides(
     slides: Slide[],
@@ -62,7 +78,7 @@ export async function splitLargeSlides(
         result.push(...splitSlides);
         totalSplit += splitSlides.length;
 
-        // تسجيل العلاقة بين الشريحة الأصلية والأجزاء
+        // Record the lineage: Original ID -> [Part1_ID, Part2_ID, ...]
         splitMap.set(
             slide.id,
             splitSlides.map(s => s.id)
@@ -78,7 +94,8 @@ export async function splitLargeSlides(
 }
 
 /**
- * تقسيم شريحة واحدة إلى عدة شرائح باستخدام نفس منطق computeSlidePages
+ * Logic for splitting a single liturgical slide.
+ * Delegates actual pagination to computeSlidePages which now preserves integrated rows.
  */
 async function splitSingleSlide(
     slide: Slide,
@@ -87,25 +104,28 @@ async function splitSingleSlide(
     containerWidthPx: number,
     measureAdapter: any
 ): Promise<Slide[]> {
-    // شرائح الـ alternatives مفيهاش lines مباشرة — مش محتاجة تتقسم
+    // Alternative slides (slides with multiple selectable versions) don't have direct lines and don't need splitting
     if (slide.has_alternatives || !slide.lines || slide.lines.length === 0) {
         return [slide];
     }
 
-    // تحديد وضع الأعمدة
+    // Resolve column mode (Single/Dual/Triple) based on script content
     const hasCopticScript = slide.lines.some(line => line.lang_type === 'coptic');
     const columnMode = resolveMultiColumnMode(slide.has_coptic ?? false, hasCopticScript);
+
+    // Calculate layout constraints
     const tolerance = paginationTolerancePx(maxHeightPx);
     const reserve = paginationVerticalReservePx(fontSizePx);
     const contentBudget = Math.max(64, maxHeightPx - reserve);
     const ceiling = paginationOverflowCeiling(contentBudget, tolerance);
 
-    // دالة لتقسيم النص الطويل
+    // Closure to wrap the low-level text splitter (sentence-aware for better splitting)
     const splitLongParagraph = (text: string, maxHeight: number): string[] => {
-        return splitTextByHeight(text, maxHeight, measureAdapter);
+        return splitTextByHeightSentences(text, maxHeight, measureAdapter);
     };
 
-    // استخدام computeSlidePages الأصلي للحصول على الصفحات
+    // Use the core pagination orchestrator to get the page breaks
+    // computeSlidePages now automatically groups lines into integrated rows
     const pages = computeSlidePages(
         slide.lines,
         columnMode,
@@ -116,41 +136,112 @@ async function splitSingleSlide(
         splitLongParagraph
     );
 
-    // إذا كانت الشريحة تحتاج لأكثر من صفحة
+    // If it all fits on one page, keep it as is
     if (pages.length <= 1) {
         return [slide];
     }
 
-    // إنشاء شرائح جديدة من الصفحات
     const splitSlides: Slide[] = [];
 
-// ✅ بعد
-pages.forEach((pageLines, index) => {
-    const partNumber = index + 1;
-    const isFirst = index === 0;
-    const isLast = index === pages.length - 1;
-    const newSlideId = `${slide.id}_p${partNumber}`;
+    pages.forEach((pageLines, index) => {
+        const partNumber = index + 1;
+        const isFirst = index === 0;
+        const isLast = index === pages.length - 1;
+        const newSlideId = `${slide.id}_p${partNumber}`;
 
-    const newSlide: Slide = {
-        ...slide,
-        id: newSlideId,
-        lines: pageLines,
-        title: pages.length > 1 && partNumber > 1
-            ? `${slide.title} (${partNumber}/${pages.length})`
-            : slide.title,
-        // المقدمة فقط في أول جزء، الخاتمة فقط في آخر جزء
-        intonation: isFirst ? slide.intonation : null,
-        conclusion: isLast  ? slide.conclusion : null,
-    };
+        const newSlide: Slide = {
+            ...slide,
+            id: newSlideId,
+            lines: pageLines,
+            // Append part numbering to the title (e.g., "The Prayer (2/3)")
+            title: pages.length > 1 && partNumber > 1
+                ? `${slide.title} (${partNumber}/${pages.length})`
+                : slide.title,
+            // Only keep intonation in the first part and conclusion in the last part
+            intonation: isFirst ? slide.intonation : null,
+            conclusion: isLast ? slide.conclusion : null,
+        };
 
-    splitSlides.push(newSlide);
-});
+        splitSlides.push(newSlide);
+    });
 
     return splitSlides;
 }
 
 /**
- * تقسيم النص حسب الارتفاع المحدد
+ * Splits a single text paragraph into multiple segments based on rendered height.
+ * Uses sentence boundaries for cleaner splits.
+ */
+function splitTextByHeightSentences(
+    text: string,
+    maxHeightPx: number,
+    measureAdapter: any
+): string[] {
+    if (!text || text.trim().length === 0) {
+        return [text];
+    }
+
+    // Split into sentences first (respects Arabic/Coptic punctuation)
+    const sentences = splitIntoSentences(text);
+
+    if (sentences.length === 0) {
+        return [text];
+    }
+
+    const parts: string[] = [];
+    let currentPart = '';
+    let currentHeight = 0;
+
+    for (let i = 0; i < sentences.length; i++) {
+        const sentence = sentences[i];
+        const testPart = currentPart ? `${currentPart} ${sentence}` : sentence;
+        const testHeight = measureAdapter.arabicParagraph(testPart);
+
+        if (testHeight > maxHeightPx && currentPart) {
+            // Current sentence would exceed height, save current part and start new
+            parts.push(currentPart);
+            currentPart = sentence;
+            currentHeight = measureAdapter.arabicParagraph(sentence);
+        } else {
+            // Sentence fits, continue accumulating
+            currentPart = testPart;
+            currentHeight = testHeight;
+        }
+    }
+
+    // Add the last part
+    if (currentPart) {
+        parts.push(currentPart);
+    }
+
+    // If no split was actually needed, return original
+    return parts.length > 0 ? parts : [text];
+}
+
+/**
+ * Splits text into sentences by looking for Arabic/English punctuation.
+ */
+function splitIntoSentences(text: string): string[] {
+    if (!text.trim()) return [];
+    // Split by . ! ؟ ; : followed by space or end of string
+    const sentences = text.split(/([.!؟;:]+[\s\n]+|[\n]+)/);
+    const result: string[] = [];
+    for (let i = 0; i < sentences.length; i++) {
+        if (sentences[i].trim()) {
+            if (i + 1 < sentences.length && /[.!؟;:]/.test(sentences[i + 1]?.trim() || '')) {
+                result.push(sentences[i] + sentences[i + 1]);
+                i++;
+            } else {
+                result.push(sentences[i]);
+            }
+        }
+    }
+    return result.filter(s => s.trim().length > 0);
+}
+
+/**
+ * Legacy word-based text splitter (kept for backward compatibility).
+ * Use splitTextByHeightSentences for better results.
  */
 function splitTextByHeight(
     text: string,
@@ -161,7 +252,7 @@ function splitTextByHeight(
         return [text];
     }
 
-    // تقسيم النص إلى كلمات (مع مراعاة اللغة العربية)
+    // Tokenize by whitespace
     const words = text.split(/\s+/);
     const parts: string[] = [];
     let currentPart = '';
@@ -173,28 +264,27 @@ function splitTextByHeight(
         const testHeight = measureAdapter.arabicParagraph(testPart);
 
         if (testHeight > maxHeightPx && currentPart) {
-            // الكلمة الحالية لا تتسع، احفظ الجزء الحالي وابدأ جزء جديد
+            // If the current word makes the segment exceed height, stop here and start a new part
             parts.push(currentPart);
             currentPart = word;
             currentHeight = measureAdapter.arabicParagraph(word);
         } else {
-            // الكلمة تتسع، أضفها للجزء الحالي
+            // Part fits, continue accumulating
             currentPart = testPart;
             currentHeight = testHeight;
         }
     }
 
-    // أضف آخر جزء
     if (currentPart) {
         parts.push(currentPart);
     }
 
-    // إذا لم يتم التقسيم، أرجع النص الأصلي
     return parts.length > 0 ? parts : [text];
 }
 
 /**
- * حساب الارتفاع الإجمالي للشريحة قبل التقسيم (للتقييم)
+ * Estimates the total rendered height of a slide BEFORE splitting.
+ * This is used to decide if splitLargeSlides needs to be called.
  */
 export async function estimateSlideHeight(
     slide: Slide,
@@ -214,7 +304,7 @@ export async function estimateSlideHeight(
     const lineGap = PRES_ROW_BLOCK_STACK_GAP_PX;
 
     if (columnMode === 'single') {
-        // حساب ارتفاع كل سطر في الوضع العادي
+        // Calculate each line's height and accumulate with stack gaps and speaker offsets
         for (let i = 0; i < slide.lines.length; i++) {
             const line = slide.lines[i];
             const prevLine = i > 0 ? slide.lines[i - 1] : null;
@@ -231,7 +321,7 @@ export async function estimateSlideHeight(
             }
         }
     } else {
-        // حساب ارتفاع الأعمدة المتعددة
+        // Calculate row heights for multi-column layouts
         const arabicLines = slide.lines.filter(l => l.lang_type === 'arabic');
         const arcopticLines = slide.lines.filter(l => l.lang_type === 'coptic_arabized');
         const copticLines = slide.lines.filter(l => l.lang_type === 'coptic');
@@ -268,7 +358,7 @@ export async function estimateSlideHeight(
 }
 
 /**
- * التحقق مما إذا كانت الشريحة بحاجة للتقسيم
+ * Predicate to check if a slide exceeds the maximum height and requires splitting.
  */
 export async function needsSplitting(
     slide: Slide,
@@ -289,14 +379,15 @@ export async function needsSplitting(
 }
 
 /**
- * دالة مساعدة لدمج الشرائح المقسمة (في حالة الحاجة للتراجع)
+ * Helper to revert split sub-slides back into their original single-slide form.
+ * Useful if the viewport changes and splitting is no longer required.
  */
 export function mergeSlides(slides: Slide[], splitMap: Map<string, string[]>): Slide[] {
     const merged: Slide[] = [];
     const processed = new Set<string>();
 
     for (const slide of slides) {
-        // البحث عن الشريحة الأصلية
+        // Identify the original slide ID for this part
         let originalId = slide.id;
         let isPart = false;
 
@@ -312,7 +403,7 @@ export function mergeSlides(slides: Slide[], splitMap: Map<string, string[]>): S
             merged.push(slide);
             processed.add(slide.id);
         } else if (isPart && !processed.has(originalId)) {
-            // جمع جميع أجزاء الشريحة الأصلية
+            // Collect all parts of the original slide
             const originalSlide = slides.find(s => s.id === originalId);
             if (originalSlide) {
                 merged.push(originalSlide);

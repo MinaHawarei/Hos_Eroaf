@@ -9,13 +9,17 @@ import {
 } from '@/utils/presentationLayout';
 
 /**
- * ChromaMirror — Broadcast-ready chroma-key presentation mode.
- *
- * - Green (#00b140) background for chroma keying
- * - Text at bottom of screen with semi-transparent container
- * - No title/header — only text content
- * - TV-safe margins (5% inset)
- * - App logo displayed initially with fade-in animation
+ * ChromaMirror Component
+ * 
+ * A specialized presentation mode designed for live broadcasting and chroma keying.
+ * It provides a high-contrast environment (typically green) that can be removed 
+ * by broadcasting software (e.g., OBS, vMix) to overlay liturgical text on video.
+ * 
+ * Key Features:
+ * - Fullscreen mode with hidden cursor.
+ * - TV-safe margin enforcement (5% inset).
+ * - Lower-third text positioning (constrained to bottom 45% of screen).
+ * - Real-time synchronization with the master presentation via BroadcastChannel.
  */
 export default function ChromaMirror() {
     const { state } = useSync('receiver');
@@ -25,23 +29,33 @@ export default function ChromaMirror() {
     const containerRef = useRef<HTMLDivElement>(null);
     const [containerHeight, setContainerHeight] = useState(400);
 
-    // Enter fullscreen on initialization (or first click if browser blocks auto)
+    /**
+     * Initialization effect:
+     * 1. Attempts to enter fullscreen mode.
+     * 2. Sets up the BroadcastChannel for master-mirror communication.
+     * 3. Handles window teardown notifications.
+     */
     useEffect(() => {
         const enterFullscreen = () => {
             if (!document.fullscreenElement) {
-                document.documentElement.requestFullscreen().catch(() => {});
+                // Requesting fullscreen on the document root
+                document.documentElement.requestFullscreen().catch(() => {
+                    // Browser might block auto-fullscreen without user interaction
+                });
             }
+            // Disable interactivity (cursor, clicks) once in fullscreen
             setInteractivityEnabled(false);
         };
 
-        // Try immediately
+        // Attempt immediate entry (might fail depending on browser policy)
         enterFullscreen();
 
-        // Also bind to click as fallback
+        // Fallback: Bind to a single click if auto-entry was blocked
         document.addEventListener('click', enterFullscreen, { once: true });
 
         const channel = new BroadcastChannel('presentation_sync');
         const handleBeforeUnload = () => {
+            // Notify the master window that this mirror instance is closing
             channel.postMessage({ type: 'MIRROR_CLOSED' });
         };
 
@@ -54,10 +68,13 @@ export default function ChromaMirror() {
         };
     }, []);
 
-    // Hide logo after first state arrives (with exit animation)
+    /**
+     * Logo lifecycle effect. Transistions the initial splash logo out 
+     * once the first piece of presentation state is received.
+     */
     useEffect(() => {
         if (state && state.currentSlide && showLogo) {
-            // Start exit animation
+            // Start the CSS exit animation
             setLogoExiting(true);
             const timer = setTimeout(() => {
                 setShowLogo(false);
@@ -83,7 +100,7 @@ export default function ChromaMirror() {
         return () => ro.disconnect();
     }, []);
 
-    // Waiting/Logo state
+    // Render the initial "Waiting/Splash" state with the app logo
     if (!state || !state.currentSlide) {
         return (
             <div
@@ -95,12 +112,12 @@ export default function ChromaMirror() {
                     <div className={`flex flex-col items-center gap-6 ${showLogo ? 'chroma-logo-enter' : ''}`}>
                         <AppLogoIcon className="h-32 w-32 text-white drop-shadow-2xl" />
                         <h1 className="text-white text-4xl font-bold font-serif tracking-wide drop-shadow-lg">
-                            هوس إيروف
+                            Hos Eroaf
                         </h1>
                         <p className="text-white/60 text-lg animate-pulse" dir="rtl">
                             {interactivityEnabled
-                                ? 'اضغط في أي مكان لتفعيل ملء الشاشة...'
-                                : 'في انتظار بدء العرض...'}
+                                ? 'Click anywhere to enable fullscreen...'
+                                : 'Waiting for presentation to start...'}
                         </p>
                     </div>
                 </div>
@@ -146,7 +163,7 @@ export default function ChromaMirror() {
                     <div className="flex flex-col items-center gap-6">
                         <AppLogoIcon className="h-32 w-32 text-white drop-shadow-2xl" />
                         <h1 className="text-white text-4xl font-bold font-serif tracking-wide drop-shadow-lg">
-                            هوس إيروف
+                            Hos Eroaf
                         </h1>
                     </div>
                 </div>

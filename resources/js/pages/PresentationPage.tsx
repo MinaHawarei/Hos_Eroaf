@@ -30,26 +30,50 @@ import Cookies from 'js-cookie';
 import { LiturgySection, SlideAlternativeItem, SlideAlternativeSection } from '@/types';
 import { AlternativeSwitcher } from '@/components/Liturgy/AlternativeSwitcher';
 
+/**
+ * Represents a slide in the presentation deck.
+ * Slides can be original content or results of splitting larger blocks.
+ */
 interface Slide {
+    /** Unique identifier for the slide */
     id: string;
+    /** Code identifying the liturgical section this slide belongs to */
     section_code: string;
+    /** Human-readable name of the liturgical section */
     section_name: string;
+    /** Optional intonation/intro text for the slide */
     intonation?: string | null;
+    /** Optional conclusion text for the slide */
     conclusion?: string | null;
+    /** Display title for the slide */
     title?: string;
+    /** Array of text lines to be rendered */
     lines?: any[];
+    /** Whether Coptic script is present in the lines */
     has_coptic?: boolean;
+    /** Whether this slide has alternative content versions (e.g., Seasonal variations) */
     has_alternatives?: boolean;
+    /** Index of the currently active alternative if multiple exist */
     active_index?: number;
+    /** List of alternative content items */
     alternatives?: SlideAlternativeItem[];
 }
 
+/**
+ * Props for the PresentationPage component.
+ */
 interface PresentationPageProps {
+    /** Unique key for the current liturgical day */
     dayKey: string;
+    /** Formatted Coptic date string */
     copticDate: string;
+    /** label for the current liturgical season */
     seasonLabel: string;
+    /** Complete list of sections for navigation */
     sections: LiturgySection[];
+    /** Initial list of slides to be processed and displayed */
     slides: Slide[];
+    /** Default font size used if no persistent setting exists */
     defaultBaseFontSize?: number;
 }
 
@@ -58,11 +82,11 @@ const ZOOM_STEP = 0.1;
 const ZOOM_MIN = 0.5;
 const ZOOM_MAX = 2;
 
-// الـ padding الثابت للـ main container (pt-4 pb-5 = 16px + 20px = 36px)
-// + مسافة إضافية للأمان تمنع أي اقتطاع
+// Static padding for the main container (pt-4 pb-5 = 16px + 20px = 36px)
+// plus an additional safety margin to prevent any accidental text clipping.
 const MAIN_PADDING_PX = 36 + 8;
 
-// ارتفاع شريط التنقل السفلي (h-24 = 96px)
+// Height of the bottom navigation bar (h-24 = 96px)
 const NAV_BAR_HEIGHT_PX = 96;
 
 function readStoredZoom(): number {
@@ -118,6 +142,7 @@ export default function PresentationPage({
 
     const mainRef = useRef<HTMLElement>(null);
     const [readerSlotHeight, setReaderSlotHeight] = useState(400);
+    // Navigation and state synchronization metadata
     const [readerNav, setReaderNav] = useState({
         isFirstPage: true,
         isLastPage: true,
@@ -125,17 +150,27 @@ export default function PresentationPage({
         pageCount: 1,
     });
 
+    // Font size calculation including the user-controlled zoom scale
     const effectiveFontSize = Math.round(baseFontSize * zoomScale);
 
-    // الارتفاع الفعلي المتاح للـ SplitViewReader بعد خصم كل العناصر الثابتة
-    // readerSlotHeight = الارتفاع الحقيقي للـ div الحاوي (يشمل header + content)
-    // نخصم منه: ارتفاع الـ header الفعلي + padding الـ main + شريط التنقل
+    /**
+     * Calculate the actual available height for the SplitViewReader.
+     * 
+     * readerSlotHeight is the total height of the main viewport.
+     * We subtract:
+     * 1. The actual measured height of the slide header.
+     * 2. The main container's vertical padding.
+     * 3. The fixed height of the navigation bar.
+     */
     const effectiveReaderHeight = Math.max(
         200,
         readerSlotHeight - slideHeaderHeight - MAIN_PADDING_PX - NAV_BAR_HEIGHT_PX
     );
 
-    // قياس ارتفاع الـ header عند كل تغيير في الشريحة
+    /**
+     * Measures the actual rendered height of the slide header (name + ornament).
+     * This measurement is crucial for calculating the remaining height for slide content.
+     */
     useLayoutEffect(() => {
         const el = slideHeaderRef.current;
         if (!el) return;
@@ -177,9 +212,17 @@ export default function PresentationPage({
 
             const measureAdapter = {
                 arabicParagraph: (t: string) => paginator.measureArabicParagraphHeight(t),
-                dualRow: (ar: string, copAr: string) => paginator.measureDualColumnRowHeight(ar, copAr),
-                tripleRow: (ar: string, copAr: string, cop: string) =>
-                    paginator.measureTripleColumnRowHeight(ar, copAr, cop),
+                dualRow: (ar: string, copAr: string) => paginator.measureFullRowHeight(ar, copAr, '', false),
+                tripleRow: (ar: string, copAr: string, cop: string) => paginator.measureFullRowHeight(ar, copAr, cop, true),
+                fullRowHeight: (ar: string, copAr: string, cop: string, triple: boolean) =>
+                    paginator.measureFullRowHeight(ar, copAr, cop, triple),
+                measureRowWithRatios: (ar: string, copAr: string, cop: string, triple: boolean, ratios: number[]) =>
+                    paginator.measureRowWithRatios(ar, copAr, cop, triple, ratios),
+                findBalancedRatios: (ar: string, copAr: string, cop: string, triple: boolean) =>
+                    paginator.findBalancedRatios(ar, copAr, cop, triple),
+                splitFullRowSynchronizedWithRatios: (
+                    ar: string, copAr: string, cop: string, triple: boolean, maxH: number, ratios: number[]
+                ) => paginator.splitFullRowSynchronizedWithRatios(ar, copAr, cop, triple, maxH, ratios),
             };
 
             // Calculate segment height based on presentation mode
@@ -204,10 +247,11 @@ export default function PresentationPage({
             setSplitInfo(result);
             paginator.cleanup();
 
+            // Log segmentation results for debugging/optimisation
             if (result.totalSplitSlides > result.totalOriginalSlides) {
                 console.log(
-                    `تم تقسيم الشرائح: ${result.totalOriginalSlides} → ${result.totalSplitSlides} شريحة ` +
-                    `(+${result.totalSplitSlides - result.totalOriginalSlides} شريحة جديدة)`
+                    `Slides segmented: ${result.totalOriginalSlides} → ${result.totalSplitSlides} slides ` +
+                    `(+${result.totalSplitSlides - result.totalOriginalSlides} new segments generated)`
                 );
             }
         } catch (error) {
@@ -396,6 +440,10 @@ export default function PresentationPage({
         );
     }
 
+    /**
+     * Jumps to a specific liturgical section in the presentation deck.
+     * Used by the sidebar navigation.
+     */
     const jumpToSection = (code: string) => {
         const idx = deck.findIndex((s) => s.section_code === code);
         if (idx !== -1) {
@@ -562,8 +610,8 @@ export default function PresentationPage({
 
                     {/*
                      * ── Reader Slot ──
-                     * يقيس الارتفاع الكلي للمنطقة — لكن الـ SplitViewReader
-                     * يستلم effectiveReaderHeight المخصوم منه الـ header
+                     * Measures the total available height for the viewport.
+                     * SplitViewReader receives effectiveReaderHeight, which accounts for the header.
                      */}
                     <div
                         ref={readerSlotRef}
@@ -628,7 +676,7 @@ export default function PresentationPage({
                 </div>
             </main>
 
-            {/* ── أزرار التقليب العائمة ── */}
+            {/* ── Floating Navigation Controls ── */}
             <div
                 className="fixed bottom-0 left-0 right-0 z-30 flex h-24 items-end justify-center pb-6 pointer-events-none"
             >
@@ -664,7 +712,7 @@ export default function PresentationPage({
                 </div>
             </div>
 
-            {/* ── أزرار التكبير والتصغير العائمة ── */}
+            {/* ── Floating Zoom Controls ── */}
             <div
                 className={`fixed bottom-4 left-4 z-40 flex flex-col gap-2 pointer-events-auto transition-all duration-500 ${isFullscreen ? 'opacity-0 hover:opacity-100' : 'opacity-100'
                     }`}

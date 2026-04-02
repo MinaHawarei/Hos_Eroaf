@@ -4,14 +4,16 @@ import { useSync } from '@/hooks/useSync';
 import { SplitViewReader } from '@/components/SplitViewReader';
 
 /**
- * MirrorComponent — Synchronized mirror display that replicates
- * the active presentation state exactly.
- *
- * Features:
- * - Fully mirrors the main presentation's current slide
- * - Correctly displays alternatives (only the active one)
- * - Dynamic layout with ResizeObserver for proper text fitting
- * - Matches transitions and layout logic from the main view
+ * MirrorComponent
+ * 
+ * A synchronized secondary display that exactly replicates the master presentation state.
+ * It is typically used on additional monitors/projectors where user interaction is not required.
+ * 
+ * Key Features:
+ * - Real-time state synchronization via useSync('receiver').
+ * - Support for liturgical alternative content (seasonal variations).
+ * - Automatic fullscreen entry on initial user interaction.
+ * - Dynamic layout adjustment based on measured header and content heights.
  */
 export default function MirrorComponent() {
     const { state } = useSync('receiver');
@@ -21,23 +23,32 @@ export default function MirrorComponent() {
     const [contentHeight, setContentHeight] = useState(400);
     const [headerHeight, setHeaderHeight] = useState(0);
 
-    // Enter fullscreen on initialization (or first click if browser blocks auto)
+    /**
+     * Initialization effect:
+     * 1. Attempts to enter fullscreen mode (browser permitting).
+     * 2. Sets up a BroadcastChannel for auxiliary communication with the master.
+     * 3. Handles window closure notifications.
+     */
     useEffect(() => {
         const enterFullscreen = () => {
             if (!document.fullscreenElement) {
-                document.documentElement.requestFullscreen().catch(() => {});
+                document.documentElement.requestFullscreen().catch(() => {
+                    // Browser policy may block programmatic fullscreen without user gesture
+                });
             }
+            // Once entry is attempted, we hide the cursor and disable interaction
             setInteractivityEnabled(false);
         };
 
         // Try immediately
         enterFullscreen();
 
-        // Also bind to click as fallback
+        // Also bind to a one-time click as a fallback for browser blocks
         document.addEventListener('click', enterFullscreen, { once: true });
 
         const channel = new BroadcastChannel('presentation_sync');
         const handleBeforeUnload = () => {
+            // Inform the master presentation that this mirror window is closing
             channel.postMessage({ type: 'MIRROR_CLOSED' });
         };
 
@@ -85,12 +96,17 @@ export default function MirrorComponent() {
         }
     }, [state?.slideId]);
 
-    // Compute effective reader height (matching PresentationPage logic)
+    /**
+     * Calculates the effective height available for line content.
+     * Must synchronize with PresentationPage's calculation to ensure
+     * identical pagination and line breaks across displays.
+     */
     const effectiveReaderHeight = useMemo(() => {
-        const PADDING = 44; // top + bottom padding + safety margin
+        const PADDING = 44; // Matches MAIN_PADDING_PX (36) + safety margin (8)
         return Math.max(200, contentHeight - headerHeight - PADDING);
     }, [contentHeight, headerHeight]);
 
+    // Render a "Waiting" screen if no presentation state has been received yet
     if (!state || !state.currentSlide) {
         return (
             <div
@@ -102,8 +118,8 @@ export default function MirrorComponent() {
                     <div className="h-20 w-20 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
                     <p className="text-muted-foreground font-serif text-lg animate-pulse" dir="rtl">
                         {interactivityEnabled
-                            ? 'اضغط في أي مكان لتفعيل ملء الشاشة والبدء...'
-                            : 'في انتظار بدء العرض من الشاشة الرئيسية...'}
+                            ? 'Click anywhere to enable fullscreen and begin...'
+                            : 'Waiting for presentation to start from main screen...'}
                     </p>
                 </div>
             </div>

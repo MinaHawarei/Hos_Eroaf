@@ -1,6 +1,18 @@
 import { useEffect, useState } from 'react';
 import { router } from '@inertiajs/react';
 
+/**
+ * usePresentationNavigation Hook
+ * 
+ * Manages keyboard shortcuts, manual navigation, and fullscreen state for the 
+ * presentation viewer.
+ * 
+ * @param slides - The array of current slides.
+ * @param currentSlideIndex - Current slide index.
+ * @param setCurrentSlideIndex - Setter for the slide index.
+ * @param onNext - Optional callback for custom 'Next' logic (e.g., page-based sub-navigation).
+ * @param onPrev - Optional callback for custom 'Previous' logic.
+ */
 export function usePresentationNavigation(
     slides: any[],
     currentSlideIndex: number,
@@ -12,23 +24,28 @@ export function usePresentationNavigation(
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
+            // Forward navigation (Right Arrow / Space)
             if (e.key === 'ArrowRight' || e.key === ' ') {
                 e.preventDefault();
                 if (onNext) onNext();
                 else if (currentSlideIndex < slides.length - 1) {
                     setCurrentSlideIndex(currentSlideIndex + 1);
                 }
-            } else if (e.key === 'ArrowLeft') {
+            } 
+            // Backward navigation (Left Arrow)
+            else if (e.key === 'ArrowLeft') {
                 e.preventDefault();
                 if (onPrev) onPrev();
                 else if (currentSlideIndex > 0) {
                     setCurrentSlideIndex(currentSlideIndex - 1);
                 }
-            } else if (e.key === 'Escape') {
+            } 
+            // Exit Fullscreen or go Home (Escape)
+            else if (e.key === 'Escape') {
                 if (document.fullscreenElement) {
                     document.exitFullscreen().catch(console.error);
                 } else {
-                    router.visit('/'); // or back to reader
+                    router.visit('/'); // Return to Dashboard if not in fullscreen
                 }
             }
         };
@@ -37,6 +54,7 @@ export function usePresentationNavigation(
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [currentSlideIndex, slides.length, setCurrentSlideIndex, onNext, onPrev]);
 
+    /** Toggles native browser fullscreen for the entire document */
     const toggleFullscreen = async () => {
         if (!document.fullscreenElement) {
             await document.documentElement.requestFullscreen().catch(console.error);

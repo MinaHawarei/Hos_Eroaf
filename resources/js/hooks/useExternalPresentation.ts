@@ -2,20 +2,32 @@ import { useEffect, useRef, useCallback, useState } from 'react';
 
 const CHANNEL_NAME = 'hos-erof-presentation';
 
+/**
+ * Defines the state structure sent to the external mirror.
+ */
 interface PresentationState {
+    /** Current slide index */
     slideIndex: number;
+    /** Current slide data object */
     slide: any;
+    /** Formatted Coptic date string */
     copticDate: string;
+    /** Current liturgical season name */
     seasonLabel: string;
+    /** Overall slide count */
     totalSlides: number;
 }
 
 /**
- * Generates the full HTML for the external mirror window.
- * This is a self-contained page — no route needed.
+ * Generates the full, self-contained HTML for an external mirror window. 
+ * 
+ * This 'Zero-Route' approach avoids server roundtrips by:
+ * 1. Cloning all active stylesheets and <style> tags from the current document.
+ * 2. Injecting a vanilla JS renderer that listens to BroadcastChannel.
+ * 3. Writing the result directly into an about:blank window.
  */
 function buildExternalHTML(): string {
-    // Collect all stylesheets from the current page
+    // Collect all active stylesheets to ensure the mirror looks identical to the master
     const styleSheets: string[] = [];
     document.querySelectorAll('link[rel="stylesheet"]').forEach((link) => {
         styleSheets.push((link as HTMLLinkElement).outerHTML);
@@ -29,7 +41,7 @@ function buildExternalHTML(): string {
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>عرض خارجي — هوس إيروف</title>
+    <title>External Display — Hos Eroaf</title>
     ${styleSheets.join('\n    ')}
     <style>
         /* External mirror: hide cursor, no scrollbars, no overflow */
@@ -80,7 +92,7 @@ function buildExternalHTML(): string {
         <div class="mirror-waiting">
             <div class="mirror-spinner"></div>
             <p style="font-size:1.5rem;font-family:var(--font-serif);color:var(--muted-foreground)">
-                في انتظار بدء العرض...
+                Waiting for presentation to start...
             </p>
         </div>
     </div>
@@ -206,14 +218,20 @@ function buildExternalHTML(): string {
 }
 
 /**
- * Hook that manages external mirror window(s).
- * Opens a blank window and writes the mirror HTML directly into it.
- * Uses BroadcastChannel to sync — NO BACKEND ROUTE NEEDED.
+ * useExternalPresentation Hook
+ * 
+ * A specialized hook for managing 'Zero-Route' external mirrors. 
+ * It opens blank windows and populates them with a self-contained HTML renderer,
+ * then synchronizes them via a dedicated BroadcastChannel.
  */
 export function useExternalPresentation() {
+    /** Communication channel for state updates */
     const channelRef = useRef<BroadcastChannel | null>(null);
+    /** List of active mirror window instances */
     const windowsRef = useRef<Window[]>([]);
+    /** Number of currently open external windows */
     const [externalCount, setExternalCount] = useState(0);
+    /** Cache of the most recent state to sync new windows immediately */
     const latestStateRef = useRef<PresentationState | null>(null);
 
     useEffect(() => {
@@ -242,6 +260,7 @@ export function useExternalPresentation() {
         };
     }, []);
 
+    /** Broadcats a slide update to all open external windows */
     const broadcastSlide = useCallback((state: PresentationState) => {
         latestStateRef.current = state;
         channelRef.current?.postMessage({
@@ -250,13 +269,17 @@ export function useExternalPresentation() {
         });
     }, []);
 
+    /** 
+     * Opens a new external window on the secondary screen.
+     * Uses 'about:blank' and direct document.write for zero-route deployment.
+     */
     const openExternalWindow = useCallback(() => {
         const width = window.screen.availWidth;
         const height = window.screen.availHeight;
 
         const features = `width=${width},height=${height},top=0,left=${window.screen.width},menubar=no,toolbar=no,location=no,status=no,scrollbars=no,resizable=yes`;
 
-        // Open a blank window — no route needed
+        // Open a blank window
         const newWindow = window.open(
             'about:blank',
             `hos-erof-pres-${Date.now()}`,
@@ -266,13 +289,13 @@ export function useExternalPresentation() {
         if (newWindow) {
             windowsRef.current.push(newWindow);
 
-            // Write the mirror HTML directly into the window
+            // Directly inject the HTML and script
             const html = buildExternalHTML();
             newWindow.document.open();
             newWindow.document.write(html);
             newWindow.document.close();
 
-            // Clean up on close
+            // Monitor window closure to update count
             const checkClosed = setInterval(() => {
                 if (newWindow.closed) {
                     clearInterval(checkClosed);

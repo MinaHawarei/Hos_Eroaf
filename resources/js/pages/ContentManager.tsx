@@ -10,14 +10,25 @@ import { cn } from '@/lib/utils';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+/**
+ * State representing a file currently being edited.
+ */
 interface EditingState {
+    /** Category slug (e.g., 'liturgy', 'readings') */
     category: string;
+    /** The filename including the .json extension */
     filename: string;
+    /** The parsed JSON content of the file */
     content: any;
 }
 
+/**
+ * Props for the ContentManager component.
+ */
 interface ManagerProps {
+    /** Map of categories to their respective lists of filenames */
     files: Record<string, string[]>;
+    /** Optional state if a file is already selected for editing */
     editing?: EditingState;
 }
 
@@ -44,45 +55,60 @@ const CATEGORY_TEMPLATES: Record<Category, any> = {
 };
 
 const READINGS_TABS = [
-    { id: 'vespers_psalm',  label: 'مزمور عشية' },
-    { id: 'vespers_gospel', label: 'إنجيل عشية' },
-    { id: 'matins_psalm',   label: 'مزمور باكر' },
-    { id: 'matins_gospel',  label: 'إنجيل باكر' },
-    { id: 'pauline',        label: 'البولس' },
-    { id: 'catholic',       label: 'الكاثوليكون' },
-    { id: 'praxis',         label: 'الابركسيس' },
-    { id: 'synaxarium',     label: 'السنكسار' },
-    { id: 'liturgy_psalm',  label: 'مزمور القداس' },
-    { id: 'liturgy_gospel', label: 'إنجيل القداس' },
+    { id: 'vespers_psalm',  label: 'مزمور عشية' }, // Vespers Psalm
+    { id: 'vespers_gospel', label: 'إنجيل عشية' }, // Vespers Gospel
+    { id: 'matins_psalm',   label: 'مزمور باكر' }, // Matins Psalm
+    { id: 'matins_gospel',  label: 'إنجيل باكر' }, // Matins Gospel
+    { id: 'pauline',        label: 'البولس' }, // Paulin Epistle
+    { id: 'catholic',       label: 'الكاثوليكون' }, // Catholic Epistle
+    { id: 'praxis',         label: 'الابركسيس' }, // Praxis (Acts)
+    { id: 'synaxarium',     label: 'السنكسار' }, // Synaxarium
+    { id: 'liturgy_psalm',  label: 'مزمور القداس' }, // Liturgy Psalm
+    { id: 'liturgy_gospel', label: 'إنجيل القداس' }, // Liturgy Gospel
 ];
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
 
+/**
+ * Converts an array of strings to a newline-separated string for textarea editing.
+ */
 function arrToText(arr: string[] | undefined): string {
     return Array.isArray(arr) ? arr.join('\n') : '';
 }
+
+/**
+ * Converts a newline-separated string back into an array of strings.
+ */
 function textToArr(text: string): string[] {
     return text.split('\n');
 }
 
 // ─── Sub-forms ────────────────────────────────────────────────────────────────
 
+/**
+ * Specialized form for editing 'liturgy' category files.
+ * Manages top-level metadata and a dynamic list of content blocks.
+ */
 function LiturgyForm({ content, onChange }: { content: any; onChange: (c: any) => void }) {
     if (!content) return null;
     const blocks: any[] = Array.isArray(content.content) ? content.content : [];
 
+    /** Updates a top-level property of the liturgy JSON */
     const setTop = (key: string, val: any) => onChange({ ...content, [key]: val });
 
+    /** Updates a specific property within a content block */
     const setBlock = (idx: number, key: string, val: any) => {
         const next = [...blocks];
         next[idx] = { ...next[idx], [key]: val };
         onChange({ ...content, content: next });
     };
 
+    /** Adds a new empty segment/block to the content list */
     const addBlock = () => {
         onChange({ ...content, content: [...blocks, { speaker: '', text_ar: [], text_ar_co: [], text_co: [] }] });
     };
 
+    /** Removes a content block by index */
     const removeBlock = (idx: number) => {
         const next = [...blocks];
         next.splice(idx, 1);
@@ -91,23 +117,23 @@ function LiturgyForm({ content, onChange }: { content: any; onChange: (c: any) =
 
     return (
         <div className="space-y-6">
-            {/* Top-level meta */}
+            {/* Top-level metadata fields (Title, Internal Code, Visual Style) */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-5 bg-muted/30 rounded-2xl border border-border/10">
                 <div>
-                    <label className="label-xs">العنوان</label>
+                    <label className="label-xs">Title (Arabic)</label>
                     <input className="field-input !bg-white text-black" dir="rtl" value={content.title || ''} onChange={e => setTop('title', e.target.value)} />
                 </div>
                 <div>
-                    <label className="label-xs">الكود الداخلي</label>
+                    <label className="label-xs">Internal Code</label>
                     <input className="field-input !bg-white text-black" value={content.code || ''} onChange={e => setTop('code', e.target.value)} />
                 </div>
                 <div>
-                    <label className="label-xs">Style</label>
+                    <label className="label-xs">Visual Style (Int)</label>
                     <input className="field-input !bg-white text-black" type="number" value={content.style ?? 1} onChange={e => setTop('style', Number(e.target.value))} />
                 </div>
             </div>
 
-            {/* Blocks */}
+            {/* List of editable content blocks */}
             <div className="space-y-4">
                 {blocks.map((block: any, idx: number) => (
                     <div key={idx} className="relative p-5 bg-muted/20 rounded-2xl border border-border/10 group">
@@ -121,7 +147,7 @@ function LiturgyForm({ content, onChange }: { content: any; onChange: (c: any) =
 
                         <div className="flex items-center gap-2 mb-4">
                             <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
-                                #{idx + 1}
+                                Segment #{idx + 1}
                             </span>
                             <select
                                 className="field-input !bg-white text-black flex-1"
@@ -129,41 +155,42 @@ function LiturgyForm({ content, onChange }: { content: any; onChange: (c: any) =
                                 value={block.speaker || ''}
                                 onChange={e => setBlock(idx, 'speaker', e.target.value)}
                             >
-                                <option value="">— اختر المتحدث —</option>
-                                <option value="الشعب">الشعب</option>
-                                <option value="الكاهن">الكاهن</option>
-                                <option value="الشماس">الشماس</option>
+                                <option value="">— Select Speaker —</option>
+                                <option value="الشعب">People</option>
+                                <option value="الكاهن">Priest</option>
+                                <option value="الشماس">Deacon</option>
                             </select>
                         </div>
 
+                        {/* Multi-script text area for the liturgical block */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4" dir="rtl">
                             <div>
-                                <label className="label-xs">النص العربي</label>
+                                <label className="label-xs">Arabic Text</label>
                                 <textarea
                                     className="field-textarea h-36 !bg-white text-black"
                                     dir="rtl"
                                     value={arrToText(block.text_ar)}
                                     onChange={e => setBlock(idx, 'text_ar', textToArr(e.target.value))}
-                                    placeholder="سطر لكل نص..."
+                                    placeholder="One line per segment..."
                                 />
                             </div>
                             <div>
-                                <label className="label-xs">النص القبطي المعرّب</label>
+                                <label className="label-xs">Coptic (Arabized)</label>
                                 <textarea
                                     className="field-textarea h-36 !bg-white text-black"
                                     dir="rtl"
                                     value={arrToText(block.text_ar_co)}
                                     onChange={e => setBlock(idx, 'text_ar_co', textToArr(e.target.value))}
-                                    placeholder="سطر لكل نص..."
+                                    placeholder="One line per segment..."
                                 />
                             </div>
                             <div>
-                                <label className="label-xs">النص القبطي</label>
+                                <label className="label-xs">Coptic Script</label>
                                 <textarea
                                     className="field-textarea h-36 !bg-white text-black"
                                     value={arrToText(block.text_co)}
                                     onChange={e => setBlock(idx, 'text_co', textToArr(e.target.value))}
-                                    placeholder="Coptic script..."
+                                    placeholder="Native Coptic characters..."
                                 />
                             </div>
                         </div>
@@ -177,31 +204,39 @@ function LiturgyForm({ content, onChange }: { content: any; onChange: (c: any) =
                 className="w-full py-5 border-2 border-dashed border-border/30 rounded-2xl text-sm text-muted-foreground hover:border-primary/40 hover:text-primary hover:bg-primary/5 transition-all flex items-center justify-center gap-2"
             >
                 <Plus className="h-4 w-4" />
-                إضافة فقرة جديدة
+                Add New Segment
             </button>
         </div>
     );
 }
 
+/**
+ * Specialized form for editing 'readings' and 'lectionary' category files.
+ * Features a tabbed interface for different liturgical readings (Vespers, Matins, Liturgy, etc.).
+ */
 function ReadingsForm({ content, onChange }: { content: any; onChange: (c: any) => void }) {
     const [activeTab, setActiveTab] = useState(READINGS_TABS[0].id);
     if (!content) return null;
 
+    /** Updates a top-level property (e.g., 'Day') */
     const setTop = (key: string, val: any) => onChange({ ...content, [key]: val });
 
     const readings: any[] = Array.isArray(content[activeTab]) ? content[activeTab] : [];
 
+    /** Updates a specific reading block within the active tab */
     const setReading = (rIdx: number, key: string, val: any) => {
         const next = [...readings];
         next[rIdx] = { ...next[rIdx], [key]: val };
         onChange({ ...content, [activeTab]: next });
     };
 
+    /** Adds a new empty reading block to the active tab */
     const addReading = () => {
         const next = [...readings, { title_ar: '', intonation: '', conclusion: '', text_ar: [], text_ar_co: [] }];
         onChange({ ...content, [activeTab]: next });
     };
 
+    /** Removes a reading block by index */
     const removeReading = (rIdx: number) => {
         const next = [...readings];
         next.splice(rIdx, 1);
@@ -210,20 +245,20 @@ function ReadingsForm({ content, onChange }: { content: any; onChange: (c: any) 
 
     return (
         <div className="space-y-5">
-            {/* Top meta */}
+            {/* Top-level metadata (Day Name, Design Style) */}
             <div className="grid grid-cols-2 gap-4 p-4 bg-muted/30 rounded-2xl border border-border/10">
                 <div>
-                    <label className="label-xs">اليوم</label>
-                    <input className="field-input !bg-white text-black" dir="rtl" value={content.Day || ''} onChange={e => setTop('Day', e.target.value)} placeholder="مثال: 2 توت" />
+                    <label className="label-xs">Liturgy Day</label>
+                    <input className="field-input !bg-white text-black" dir="rtl" value={content.Day || ''} onChange={e => setTop('Day', e.target.value)} placeholder="e.g.: 2 Tute" />
                 </div>
                 <div>
-                    <label className="label-xs">Style</label>
+                    <label className="label-xs">Visual Style (Int)</label>
                     <input className="field-input !bg-white text-black" type="number" value={content.style ?? 1} onChange={e => setTop('style', Number(e.target.value))} />
                 </div>
             </div>
 
             <div className="flex flex-col md:flex-row gap-5">
-                {/* Section tabs */}
+                {/* Vertical Tab Navigation for Reading Sections */}
                 <div className="md:w-52 flex-shrink-0 space-y-1">
                     {READINGS_TABS.map(tab => {
                         const count = Array.isArray(content[tab.id]) ? content[tab.id].length : 0;
@@ -251,11 +286,11 @@ function ReadingsForm({ content, onChange }: { content: any; onChange: (c: any) 
                     })}
                 </div>
 
-                {/* Reading cards */}
+                {/* Content Area for the selected reading tab */}
                 <div className="flex-1 space-y-4">
                     {readings.length === 0 && (
                         <div className="text-center py-12 border-2 border-dashed border-border/20 rounded-2xl text-muted-foreground text-sm">
-                            لا توجد قراءات لهذا القسم
+                            No readings defined for this section.
                         </div>
                     )}
                     {readings.map((r: any, rIdx: number) => (
@@ -270,38 +305,38 @@ function ReadingsForm({ content, onChange }: { content: any; onChange: (c: any) 
 
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                 <div className="md:col-span-3">
-                                    <label className="label-xs">العنوان</label>
+                                    <label className="label-xs">Title/Header</label>
                                     <input className="field-input !bg-white text-black" dir="rtl" value={r.title_ar || ''} onChange={e => setReading(rIdx, 'title_ar', e.target.value)} />
                                 </div>
                                 <div>
-                                    <label className="label-xs">اللحن (عربي)</label>
+                                    <label className="label-xs">Intonation (Intro)</label>
                                     <input className="field-input !bg-white text-black" dir="rtl" value={r.intonation || ''} onChange={e => setReading(rIdx, 'intonation', e.target.value)} />
                                 </div>
                                 <div className="md:col-span-2">
-                                    <label className="label-xs">اللحن (قبطي)</label>
+                                    <label className="label-xs">Conclusion/Ending</label>
                                     <input className="field-input !bg-white text-black" dir="rtl" value={r.conclusion || ''} onChange={e => setReading(rIdx, 'conclusion', e.target.value)} />
                                 </div>
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
-                                    <label className="label-xs">النص العربي</label>
+                                    <label className="label-xs">Arabic Text Content</label>
                                     <textarea
                                         className="field-textarea h-40"
                                         dir="rtl"
                                         value={arrToText(r.text_ar)}
                                         onChange={e => setReading(rIdx, 'text_ar', textToArr(e.target.value))}
-                                        placeholder="سطر لكل جملة..."
+                                        placeholder="One line per sentence..."
                                     />
                                 </div>
                                 <div>
-                                    <label className="label-xs">النص القبطي المعرّب</label>
+                                    <label className="label-xs">Coptic (Arabized)</label>
                                     <textarea
                                         className="field-textarea h-40"
                                         dir="rtl"
                                         value={arrToText(r.text_ar_co)}
                                         onChange={e => setReading(rIdx, 'text_ar_co', textToArr(e.target.value))}
-                                        placeholder="سطر لكل جملة..."
+                                        placeholder="One line per sentence..."
                                     />
                                 </div>
                             </div>
@@ -314,7 +349,7 @@ function ReadingsForm({ content, onChange }: { content: any; onChange: (c: any) 
                         className="w-full py-4 border-2 border-dashed border-border/30 rounded-2xl text-sm text-muted-foreground hover:border-primary/40 hover:text-primary hover:bg-primary/5 transition-all flex items-center justify-center gap-2"
                     >
                         <Plus className="h-4 w-4" />
-                        إضافة قراءة
+                        Add Reading Entry
                     </button>
                 </div>
             </div>
@@ -322,18 +357,25 @@ function ReadingsForm({ content, onChange }: { content: any; onChange: (c: any) 
     );
 }
 
+/**
+ * Specialized form for editing 'lyrics' or 'hymns' category files.
+ * Provides a simple list of lines for song/hymn lyrics.
+ */
 function LyricsForm({ content, onChange }: { content: any; onChange: (c: any) => void }) {
     if (!content) return null;
     const lines: string[] = Array.isArray(content.lyrics) ? content.lyrics : [];
 
+    /** Updates a specific line by index */
     const setLine = (idx: number, val: string) => {
         const next = [...lines];
         next[idx] = val;
         onChange({ ...content, lyrics: next });
     };
 
+    /** Appends a new empty line to the lyrics list */
     const addLine = () => onChange({ ...content, lyrics: [...lines, ''] });
 
+    /** Removes a lyric line by index */
     const removeLine = (idx: number) => {
         const next = [...lines];
         next.splice(idx, 1);
@@ -342,8 +384,9 @@ function LyricsForm({ content, onChange }: { content: any; onChange: (c: any) =>
 
     return (
         <div className="space-y-5">
+            {/* Lyric/Hymn Title */}
             <div className="p-4 bg-muted/30 rounded-2xl border border-border/10">
-                <label className="label-xs">العنوان</label>
+                <label className="label-xs">Title</label>
                 <input
                     className="field-input !bg-white text-black"
                     dir="rtl"
@@ -352,8 +395,9 @@ function LyricsForm({ content, onChange }: { content: any; onChange: (c: any) =>
                 />
             </div>
 
+            {/* Editable list of lyric lines */}
             <div className="p-5 bg-muted/20 rounded-2xl border border-border/10 space-y-2">
-                <label className="label-xs mb-3 block">كلمات الترنيمة</label>
+                <label className="label-xs mb-3 block">Lyric Content</label>
                 {lines.map((line: string, idx: number) => (
                     <div key={idx} className="flex items-center gap-2 group">
                         <span className="text-[10px] text-muted-foreground w-5 text-right flex-shrink-0 font-mono">{idx + 1}</span>
@@ -363,7 +407,7 @@ function LyricsForm({ content, onChange }: { content: any; onChange: (c: any) =>
                             value={line}
                             dir="rtl"
                             onChange={e => setLine(idx, e.target.value)}
-                            placeholder="سطر..."
+                            placeholder="Line text..."
                         />
                         <button
                             type="button"
@@ -380,7 +424,7 @@ function LyricsForm({ content, onChange }: { content: any; onChange: (c: any) =>
                     className="mt-3 w-full py-3 border-2 border-dashed border-border/30 rounded-xl text-sm text-muted-foreground hover:border-primary/40 hover:text-primary hover:bg-primary/5 transition-all flex items-center justify-center gap-2"
                 >
                     <Plus className="h-4 w-4" />
-                    إضافة سطر
+                    Add Line
                 </button>
             </div>
         </div>
@@ -389,15 +433,20 @@ function LyricsForm({ content, onChange }: { content: any; onChange: (c: any) =>
 
 // ─── New File Modal ───────────────────────────────────────────────────────────
 
+/**
+ * Modal dialog for creating a new JSON content file.
+ * Requires selecting a category and providing a unique filename.
+ */
 function NewFileModal({ onClose }: { onClose: () => void }) {
     const [category, setCategory] = useState<Category>('liturgy');
     const [filename, setFilename] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
 
+    /** Submits the creation request to the backend controller */
     const handleCreate = () => {
         const trimmed = filename.trim();
-        if (!trimmed) { setError('اسم الملف مطلوب'); return; }
+        if (!trimmed) { setError('Filename is required'); return; }
         setError('');
         setLoading(true);
 
@@ -407,7 +456,7 @@ function NewFileModal({ onClose }: { onClose: () => void }) {
             route('content.store'),
             { category, filename: finalName, content: CATEGORY_TEMPLATES[category] },
             {
-                onError: (errs) => { setError(errs.filename || 'حدث خطأ'); setLoading(false); },
+                onError: (errs) => { setError(errs.filename || 'An error occurred'); setLoading(false); },
                 onFinish: () => setLoading(false),
             }
         );
@@ -470,9 +519,13 @@ function NewFileModal({ onClose }: { onClose: () => void }) {
 
 // ─── Delete Confirm Modal ─────────────────────────────────────────────────────
 
+/**
+ * Modal dialog for confirming file deletion.
+ */
 function DeleteModal({ category, filename, onClose }: { category: string; filename: string; onClose: () => void }) {
     const [loading, setLoading] = useState(false);
 
+    /** Submits the deletion request to the backend */
     const handleDelete = () => {
         setLoading(true);
         router.delete(route('content.destroy'), {
@@ -491,15 +544,15 @@ function DeleteModal({ category, filename, onClose }: { category: string; filena
                     <div className="h-14 w-14 rounded-full bg-destructive/10 flex items-center justify-center">
                         <AlertTriangle className="h-7 w-7 text-destructive" />
                     </div>
-                    <h2 className="text-xl font-black">حذف الملف؟</h2>
+                    <h2 className="text-xl font-black">Delete File?</h2>
                     <p className="text-sm text-muted-foreground">
-                        سيتم حذف <span className="font-bold text-foreground">{filename}</span> نهائياً ولا يمكن التراجع.
+                        <span className="font-bold text-foreground">{filename}</span> will be permanently deleted. This action cannot be undone.
                     </p>
                 </div>
                 <div className="flex gap-3">
-                    <Button type="button" variant="ghost" onClick={onClose} className="flex-1">إلغاء</Button>
+                    <Button type="button" variant="ghost" onClick={onClose} className="flex-1">Cancel</Button>
                     <Button type="button" variant="destructive" onClick={handleDelete} disabled={loading} className="flex-1 rounded-full">
-                        {loading ? 'جاري الحذف...' : 'حذف'}
+                        {loading ? 'Deleting...' : 'Delete'}
                     </Button>
                 </div>
             </div>
@@ -507,8 +560,19 @@ function DeleteModal({ category, filename, onClose }: { category: string; filena
     );
 }
 
-// ─── Main Component ───────────────────────────────────────────────────────────
-
+/**
+ * ContentManager Page Component
+ * 
+ * The primary administrative interface for managing the application's liturgical 
+ * and reading JSON content files.
+ * 
+ * Features:
+ * - Sidebar file explorer with search and category filtering.
+ * - Dynamic form generation based on the selected file's category.
+ * - Raw JSON editing mode for advanced users or unsupported categories.
+ * - Integrated Create/Delete workflows.
+ * - Responsive layout with a sticky toolbar for saving/undoing changes.
+ */
 export default function ContentManager({ files, editing }: ManagerProps) {
     const [viewMode, setViewMode] = useState<'form' | 'raw'>('form');
     const [searchQuery, setSearchQuery] = useState('');
@@ -579,7 +643,7 @@ export default function ContentManager({ files, editing }: ManagerProps) {
                                     onClick={() => setShowNewModal(true)}
                                 >
                                     <FilePlus className="h-3.5 w-3.5 mr-1.5" />
-                                    جديد
+                                    New
                                 </Button>
                             </div>
 
@@ -622,7 +686,7 @@ export default function ContentManager({ files, editing }: ManagerProps) {
                                             {isOpen && (
                                                 <div className="ml-3 pl-2 border-l border-primary/10 py-0.5 flex flex-col gap-0.5">
                                                     {catFiles.length === 0 && (
-                                                        <span className="text-[11px] text-muted-foreground/50 px-3 py-1 italic">لا توجد ملفات</span>
+                                                        <span className="text-[11px] text-muted-foreground/50 px-3 py-1 italic">No files found</span>
                                                     )}
                                                     {catFiles.map(file => (
                                                         <div key={file} className="flex items-center group/item">
@@ -677,8 +741,8 @@ export default function ContentManager({ files, editing }: ManagerProps) {
                         {!editing ? (
                             <div className="flex flex-col items-center justify-center h-[60vh] text-center border-2 border-dashed border-border/10 rounded-3xl opacity-30">
                                 <FileJson className="h-20 w-20 mb-4 text-muted-foreground/30" />
-                                <h3 className="text-xl font-serif">اختر ملفاً للبدء</h3>
-                                <p className="text-sm mt-2 text-muted-foreground">إدارة القداسات والقراءات والتسابيح</p>
+                                <h3 className="text-xl font-serif">Select a file to begin</h3>
+                                <p className="text-sm mt-2 text-muted-foreground">Manage liturgies, readings, and hymns</p>
                             </div>
                         ) : (
                             <form onSubmit={handleSave} className="space-y-6 pb-32">
@@ -707,10 +771,10 @@ export default function ContentManager({ files, editing }: ManagerProps) {
                                     <div className="flex items-center gap-2 flex-shrink-0">
                                         <Button type="button" variant="ghost" size="sm" onClick={() => reset()} disabled={!editing}>
                                             <Undo2 className="h-3.5 w-3.5 mr-1.5" />
-                                            تراجع
+                                            Reset
                                         </Button>
                                         <Button type="submit" disabled={processing} className="px-6 rounded-full shadow-lg shadow-primary/20 text-sm">
-                                            {processing ? 'جاري الحفظ...' : <><Save className="h-3.5 w-3.5 mr-1.5" />حفظ</>}
+                                            {processing ? 'Saving...' : <><Save className="h-3.5 w-3.5 mr-1.5" />Save</>}
                                         </Button>
                                     </div>
                                 </div>
@@ -745,7 +809,7 @@ export default function ContentManager({ files, editing }: ManagerProps) {
                                         )}
                                         {!['liturgy', 'readings', 'lectionary', 'lyrics', 'hymns'].includes(data.category) && (
                                             <div className="text-center p-16 bg-muted/20 rounded-3xl border-2 border-dashed border-border/10 text-muted-foreground text-sm">
-                                                هذا التصنيف لا يملك واجهة مخصصة. استخدم وضع JSON.
+                                                This category does not have a specialized interface. Use JSON mode.
                                             </div>
                                         )}
                                     </div>
@@ -760,7 +824,7 @@ export default function ContentManager({ files, editing }: ManagerProps) {
                     <div className="fixed bottom-8 right-8 z-50 animate-in slide-in-from-bottom-10 fade-in duration-500">
                         <div className="bg-primary text-primary-foreground px-6 py-3 rounded-full shadow-2xl flex items-center gap-3">
                             <Save className="h-4 w-4" />
-                            <span className="font-bold text-sm">تم الحفظ بنجاح</span>
+                            <span className="font-bold text-sm">Saved successfully</span>
                         </div>
                     </div>
                 )}

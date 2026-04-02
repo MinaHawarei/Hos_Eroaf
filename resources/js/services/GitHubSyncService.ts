@@ -1,24 +1,52 @@
+/**
+ * Represents the structure of version.json used to track content updates.
+ */
 interface VersionData {
+    /** Semantic version string (e.g., '1.2.0') */
     version: string;
+    /** ISO timestamp of the last update */
     last_updated: string;
 }
 
+/**
+ * Represents an item in the GitHub repository tree.
+ */
 interface GitHubTreeItem {
+    /** Relative file path */
     path: string;
+    /** File mode (permissions) */
     mode: string;
+    /** Item type: 'blob' for files, 'tree' for directories */
     type: string;
+    /** SHA-1 hash of the file content (used for change detection) */
     sha: string;
+    /** File size in bytes */
     size?: number;
+    /** API URL of the blob */
     url: string;
 }
 
+/**
+ * Data structure for reporting synchronization progress to the UI.
+ */
 export interface SyncProgress {
+    /** Total number of files to process */
     total: number;
+    /** Number of files already processed */
     current: number;
+    /** Name of the file currently being downloaded */
     currentFile: string;
+    /** Current state of the synchronization process */
     status: 'checking' | 'downloading' | 'completed' | 'error' | 'up-to-date';
 }
 
+/**
+ * GitHubSyncService
+ * 
+ * Manages the synchronization of liturgical content files between a remote 
+ * GitHub repository and the local application storage. 
+ * Supports hash-based change detection to minimize data usage.
+ */
 export class GitHubSyncService {
     private owner = 'MinaHawarei';
     private repo = 'Hos_Eroaf';
@@ -145,7 +173,7 @@ export class GitHubSyncService {
     }
 
     /**
-     * Determines if the remote version string is higher/newer than the local version string.
+     * Determines if the remote version string is newer using semantic comparison.
      */
     private isNewer(remote: string, local: string): boolean {
         const v1 = remote.split('.').map(Number);
@@ -171,17 +199,17 @@ export class GitHubSyncService {
             return;
         }
 
-        // [2] Check for Capacitor (Mobile)
+        // [2] Check for Capacitor (Mobile/Native)
         if (typeof window !== 'undefined' && (window as any).Capacitor?.isNativePlatform()) {
             try {
-                // Dynamic import لحل مشكلة الـ Vite في الويب
+                // Dynamic import to avoid bundling filesystem dependencies in pure web environments
                 const filesystem = await import('@capacitor/filesystem');
 
                 await filesystem.Filesystem.writeFile({
                     path: path,
                     data: content,
                     directory: filesystem.Directory.Data,
-                    // الحل الصحيح لمشكلة الـ Type Error:
+                    // Specify UTF8 encoding to ensure liturgical characters (Arabic/Coptic) are preserved
                     encoding: filesystem.Encoding.UTF8
                 });
                 return;
@@ -192,10 +220,11 @@ export class GitHubSyncService {
         }
 
         // [3] Fallback for Web / Local Development
-        // في مرحلة التطوير على المتصفح، ممكن تخزن في الـ LocalStorage أو تبعت للارفل
+        // During web development, we simulate the save by logging it or persisting to LocalStorage.
         console.log(`[GitHubSyncService] Web Mode: Simulating save for ${path}`);
 
-        // اختيارياً: لو عايز تجرب الـ flow كامل في الويب، ابعتها للارفل يحفظها في مجلد content
+        // OPTIONAL: To test the full flow in a real browser context, we could proxy the save 
+        // to a local Laravel endpoint that updates the local 'storage/content' folder.
         /*
         await fetch('/api/content/sync-file', {
              method: 'POST',

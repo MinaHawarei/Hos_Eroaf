@@ -15,39 +15,43 @@ export const PRES_ROW_BLOCK_STACK_GAP_PX = 12;
 
 export type MultiColumnMode = 'single' | 'dual' | 'triple';
 
-/**
- * المسافة الإضافية لعرض المتحدث - تم تقليلها لاستغلال المساحة بشكل أفضل
+/** 
+ * Calculates extra height added when the speaker changes (e.g., 'Priest' to 'People'). 
+ * Reduced to optimize screen usage for more text content.
  */
 export function speakerBlockExtraPx(fontSizePx: number): number {
-    // تم التخفيض من fontSizePx * 1.12 إلى fontSizePx * 0.85
+    // Reduced from fontSizePx * 1.12 to fontSizePx * 0.85
     return Math.round(Math.min(40, Math.max(20, fontSizePx * 0.85)));
 }
 
-/** Upper bound for “still fits on this page” — budget plus flexible tolerance. */
+/** 
+ * Final height limit for a page: Target Budget + Tolerance. 
+ * Allows some flexibility so we don't split single lines unnecessarily if they barely exceed the budget.
+ */
 export function paginationOverflowCeiling(budgetPx: number, tolerancePx: number): number {
     return budgetPx + tolerancePx;
 }
 
 /**
- * Extra height allowed when packing lines so we do not break pages early.
- * تم تقليل التسامح لاستغلال المساحة بشكل أفضل
+ * Calculates the extra height allowance before a page split is forced.
+ * Aimed at maximizing screen real estate by allowing 8% overflow.
  */
 export function paginationTolerancePx(budgetPx: number): number {
-    // تم التخفيض من budgetPx * 0.14 إلى budgetPx * 0.08
-    // مع حد أدنى 16 وأقصى 56
+    // Reduced from 14% to 8% to keep content within safe visible limits
+    // Minimum 16px, Maximum 56px
     return Math.min(56, Math.max(16, Math.round(budgetPx * 0.08)));
 }
 
 /**
- * Reserve height from the measured slot so pagination stays inside the viewport
- * (line-height rounding, flex gaps, and safe padding).
- * تم تقليل الاحتياطي بشكل كبير لاستغلال المساحة
+ * Height reserved to account for line-height rounding, flex gaps, and safe padding.
+ * Ensures that the rendered content stays strictly within the physical viewport.
  */
 export function paginationVerticalReservePx(fontSizePx: number): number {
-    // تم التخفيض من fontSizePx * 0.42 + 6 إلى fontSizePx * 0.25 + 4
+    // Reduced from fontSizePx * 0.42 + 6 to fontSizePx * 0.25 + 4 to maximize screen space
     return Math.max(8, Math.ceil(fontSizePx * 0.25) + 4);
 }
 
+/** Returns true if any of the lines contain native Coptic script */
 export function linesHaveCopticScript(
     lines: { lang_type: string; text?: string | null }[]
 ): boolean {
@@ -59,6 +63,10 @@ export function linesHaveCopticScript(
     );
 }
 
+/**
+ * Determines whether the layout should be Single (Arabic), 
+ * Dual (Ar + CopAr), or Triple (Ar + CopAr + Coptic) column mode.
+ */
 export function resolveMultiColumnMode(
     hasCopticArabized: boolean,
     hasCopticScript: boolean

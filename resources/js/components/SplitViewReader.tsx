@@ -19,29 +19,75 @@ import {
     resolveMultiColumnMode,
     type MultiColumnMode,
 } from '@/utils/presentationLayout';
-import { applyKashida } from '@/utils/ArabicKashida';
 
+/**
+ * Represents a single line of text in the liturgical content.
+ */
 export interface Line {
+    /** Unique identifier for the line */
     id: number;
+    /** Language type determining the script and directionality */
     lang_type: 'arabic' | 'coptic_arabized' | 'coptic';
+    /** The actual text content to be displayed */
     text: string;
+    /** The person or group speaking this line (e.g., Priest, People, Deacon) */
     speaker?: string;
+    /** Liturgical intonation or chant instructions for the line */
     intonation?: string;
+    /** Conclusion or response for the line */
     conclusion?: string;
 }
 
+/**
+ * Represents a complete integrated row where all three language versions
+ * (Arabic, Coptic Arabized, Coptic Script) are bound together.
+ * This ensures that when pagination splits content, all three columns
+ * are split at the same logical points.
+ */
+interface IntegratedRow {
+    /** Unique identifier for the row */
+    id: number;
+    /** Arabic text line */
+    arabic: Line;
+    /** Coptic Arabized (pronunciation) text line */
+    copticArabized: Line;
+    /** Coptic Script text line (optional, may be empty) */
+    copticScript: Line | null;
+    /** Speaker name (same across all three) */
+    speaker?: string;
+    /** Whether this row has been split from a larger row */
+    isSplit?: boolean;
+    /** Original parent ID if this is a split segment */
+    parentId?: number;
+}
+
+/**
+ * Props for the SplitViewReader component.
+ */
 export interface SplitViewReaderProps {
+    /** Array of lines to be paginated and displayed */
     lines: Line[];
+    /** Whether the content contains Coptic script (affects layout modes) */
     hasCoptic: boolean;
+    /** Optional CSS class names for the root container */
     className?: string;
+    /** Whether to apply text justification (defaults to true) */
     justified?: boolean;
+    /** Maximum available height for content before pagination occurs */
     maxContentHeight: number;
+    /** Base font size in pixels for height calculations */
     fontSizePx: number;
+    /** Search query string to highlight matching text */
     highlightQuery?: string;
+    /** The initially active page index (defaults to 0) */
     initialPage?: number;
+    /** Global intonation/intro text for the entire slide set */
     intonation?: string | null;
+    /** Global conclusion text for the entire slide set */
     conclusion?: string | null;
+    /** Whether to render in Chroma key mode (high contrast for broadcasting) */
     chromaMode?: boolean;
+    /** Callback triggered whenever pagination metadata changes (e.g., page navigation) */
     onPaginationMetaChange?: (meta: {
         isFirstPage: boolean;
         isLastPage: boolean;
@@ -50,27 +96,223 @@ export interface SplitViewReaderProps {
     }) => void;
 }
 
+/**
+ * Handle object exposed via forwardRef to control the reader's state.
+ */
 export interface SplitViewReaderRef {
+    /** Navigates to the next page if available. Returns true if navigation occurred. */
     nextPage: () => boolean;
+    /** Navigates to the previous page if available. Returns true if navigation occurred. */
     prevPage: () => boolean;
+    /** Whether the current page is the first page */
     isFirstPage: boolean;
+    /** Whether the current page is the last page */
     isLastPage: boolean;
+    /** 0-based index of the currently active page */
     currentPageIndex: number;
+    /** Total number of pages generated after pagination */
     totalPages: number;
+    /** Flag used by parent components to decide if they should move to the next slide */
     canGoToNextSlide: boolean;
+    /** Flag used by parent components to decide if they should move to the previous slide */
     canGoToPrevSlide: boolean;
 }
 
+/**
+ * Groups lines into integrated rows where Arabic, Coptic Arabized, and Coptic Script
+ * are bound together as a single unit. This prevents separation during pagination.
+ *
+ * The algorithm assumes the backend sends lines in the following order:
+ * Arabic line 1, Coptic Arabized line 1, Coptic Script line 1,
+ * Arabic line 2, Coptic Arabized line 2, Coptic Script line 2, ...
+ *
+ * @param lines - Flat array of lines from the backend
+ * @returns Array of IntegratedRows that stay together during pagination
+ */
+function groupIntoIntegratedRows(lines: Line[]): IntegratedRow[] {
+    const rows: IntegratedRow[] = [];
+    let rowId = 0;
+
+    // Separate lines by language type
+    const arabicLines: Line[] = [];
+    const arcopticLines: Line[] = [];
+    const copticLines: Line[] = [];
+
+    for (const line of lines) {
+        if (line.lang_type === 'arabic') {
+            arabicLines.push(line);
+        } else if (line.lang_type === 'coptic_arabized') {
+            arcopticLines.push(line);
+        } else if (line.lang_type === 'coptic') {
+            copticLines.push(line);
+        }
+    }
+
+    // Determine the maximum number of rows across all language types
+    const maxRows = Math.max(arabicLines.length, arcopticLines.length, copticLines.length);
+
+    // Group lines by their index position (assuming they are in matching order)
+    for (let i = 0; i < maxRows; i++) {
+        const arabic = arabicLines[i] || null;
+        const copticArabized = arcopticLines[i] || null;
+        const copticScript = copticLines[i] || null;
+
+        // Determine the speaker (use from Arabic if available, otherwise from Coptic Arabized)
+        const speaker = arabic?.speaker || copticArabized?.speaker || copticScript?.speaker;
+
+        // Only create a row if at least one language has content
+        if (arabic || copticArabized || copticScript) {
+            rows.push({
+                id: rowId++,
+                arabic: arabic || {
+                    id: -1,
+                    lang_type: 'arabic',
+                    text: '',
+                    speaker
+                },
+                copticArabized: copticArabized || {
+                    id: -1,
+                    lang_type: 'coptic_arabized',
+                    text: '',
+                    speaker
+                },
+                copticScript: copticScript || null,
+                speaker,
+            });
+        }
+    }
+
+    return rows;
+}
+
+/**
+ * Flattens integrated rows back into lines array for pagination.
+ * Maintains the order: Arabic, then Coptic Arabized, then Coptic Script.
+ *
+ * @param rows - Array of integrated rows
+ * @returns Flat array of lines in correct display order
+ */
+function flattenIntegratedRows(rows: IntegratedRow[]): Line[] {
+    const result: Line[] = [];
+
+    for (const row of rows) {
+        result.push(row.arabic);
+        result.push(row.copticArabized);
+        if (row.copticScript) {
+            result.push(row.copticScript);
+        }
+    }
+
+    return result;
+}
+
+/**
+ * Splits an integrated row into multiple rows when it exceeds max height.
+ * This ensures that all three language columns are split at the same logical points.
+ *
+ * @param row - The integrated row to split
+ * @param maxHeightPx - Maximum allowed height in pixels
+ * @param measureAdapter - Adapter for measuring text height
+ * @param paginator - TextPaginator instance for sentence-aware splitting
+ * @returns Array of integrated rows split from the original
+ */
+function splitIntegratedRow(
+    row: IntegratedRow,
+    maxHeightPx: number,
+    measureAdapter: any,
+    paginator: TextPaginator
+): IntegratedRow[] {
+    const arabicText = row.arabic.text;
+    const copticArabizedText = row.copticArabized.text;
+    const copticScriptText = row.copticScript?.text || '';
+
+    const hasCopticScript = copticScriptText.trim().length > 0;
+
+    // If the row is already small enough, return as is
+    const rowHeight = hasCopticScript
+        ? measureAdapter.tripleRow(arabicText, copticArabizedText, copticScriptText)
+        : measureAdapter.dualRow(arabicText, copticArabizedText);
+
+    if (rowHeight <= maxHeightPx) {
+        return [row];
+    }
+
+    // Split the Arabic text into sentence-aware chunks
+    const arabicChunks = paginator.paginate(arabicText, maxHeightPx);
+
+    if (arabicChunks.length <= 1) {
+        // Cannot split further, return as is
+        return [row];
+    }
+
+    // Split the Coptic Arabized text into same number of chunks
+    const copticArabizedChunks = paginator.paginate(copticArabizedText, maxHeightPx);
+    const copticScriptChunks = hasCopticScript
+        ? paginator.paginate(copticScriptText, maxHeightPx)
+        : [];
+
+    // Ensure all chunks arrays have the same length
+    const targetChunks = Math.max(arabicChunks.length, copticArabizedChunks.length, copticScriptChunks.length);
+
+    // Pad shorter arrays with empty strings
+    const padArray = (arr: string[], len: number): string[] => {
+        const padded = [...arr];
+        while (padded.length < len) padded.push('');
+        return padded;
+    };
+
+    const paddedArabicChunks = padArray(arabicChunks, targetChunks);
+    const paddedCopticArabizedChunks = padArray(copticArabizedChunks, targetChunks);
+    const paddedCopticScriptChunks = padArray(copticScriptChunks, targetChunks);
+
+    // Create new integrated rows from the chunks
+    const splitRows: IntegratedRow[] = [];
+
+    for (let i = 0; i < targetChunks; i++) {
+        splitRows.push({
+            id: row.id * 10000 + i,
+            arabic: { ...row.arabic, text: paddedArabicChunks[i] },
+            copticArabized: { ...row.copticArabized, text: paddedCopticArabizedChunks[i] },
+            copticScript: row.copticScript ? { ...row.copticScript, text: paddedCopticScriptChunks[i] } : null,
+            speaker: row.speaker,
+            isSplit: true,
+            parentId: row.id,
+        });
+    }
+
+    return splitRows;
+}
+
+/**
+ * Processes line text for HTML rendering, escaping special characters
+ * and applying search highlights if a query is provided.
+ *
+ * @param line The line object containing text
+ * @param highlightQuery Optional query string to highlight
+ * @returns Object with sanitised and highlighted HTML content
+ */
 function lineHtml(line: Line, highlightQuery: string | undefined): { __html: string } {
     const raw = line.text ?? '';
+    // If no search query, perform standard HTML escaping
     if (!highlightQuery?.trim()) {
         return { __html: raw.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') };
     }
+    // Highlight matches using the SearchService
     return { __html: SearchService.highlightMatch(highlightQuery, raw) };
 }
 
 const rowGapClass = 'gap-3 md:gap-4';
 
+/**
+ * Generates Tailwind CSS class names for body paragraphs based on layout state.
+ *
+ * @param justified Whether text should be justified
+ * @param extra Additional custom classes
+ * @param isRtl Whether the text direction is Right-to-Left
+ * @param isCopticScript Whether the text is native Coptic script
+ * @param isChroma Whether chroma mode is active (affects color)
+ * @returns Combined class string
+ */
 function bodyParagraphClassNames(
     justified: boolean,
     extra?: string,
@@ -80,6 +322,7 @@ function bodyParagraphClassNames(
 ): string {
     return cn(
         'pres-slide-body-text font-bold break-words text-center',
+        // Use different fonts and directionality settings based on script type
         isCopticScript ? 'pres-coptic-text' : 'font-reading pres-arabic-text',
         PRES_BODY_LEADING_CLASS,
         isChroma && 'text-white',
@@ -87,6 +330,74 @@ function bodyParagraphClassNames(
     );
 }
 
+/**
+ * Calculates the effective text length for column width distribution.
+ * Ignores spaces, punctuation, and kashida characters to focus on actual content.
+ *
+ * @param text The text to measure
+ * @returns Effective character count for width calculation
+ */
+function getEffectiveTextLength(text: string): number {
+    if (!text) return 0;
+    // Remove spaces, punctuation, and kashida (tatweel) characters
+    // This ensures column width is based on meaningful content only
+    return text.replace(/[\s\u0640\u061F\u060C\u061B\u061E\u066A-\u066D\u06D4]+/g, '').length;
+}
+
+/**
+ * Calculates dynamic column width ratios based on actual content length.
+ *
+ * @param texts Array of text strings for each column (1-3 columns)
+ * @returns Array of ratios that sum to 1 (e.g., [0.4, 0.6] for two columns)
+ */
+function calculateDynamicRatios(texts: string[]): number[] {
+    // Filter out empty texts
+    const validTexts = texts.filter(t => t && t.trim().length > 0);
+    const columnCount = validTexts.length;
+
+    // If only one column has content, it takes 100% width
+    if (columnCount === 1) {
+        return texts.map(t => (t && t.trim().length > 0 ? 1 : 0));
+    }
+
+    // Calculate effective lengths for all columns
+    const lengths = texts.map(t => getEffectiveTextLength(t || ''));
+    const totalLength = lengths.reduce((sum, len) => sum + len, 0);
+
+    if (totalLength === 0) {
+        // Fallback to equal distribution if no measurable content
+        return texts.map(() => 1 / texts.length);
+    }
+
+    // Calculate initial ratios based on content length
+    let ratios = lengths.map(len => len / totalLength);
+
+    // Apply constraints to avoid extreme ratios
+    const minRatio = 0.20; // Minimum 20% width for any column with content
+    const maxRatio = 0.80; // Maximum 80% width for any single column
+
+    // Apply minimum constraints
+    let adjusted = ratios.map(r => Math.max(minRatio, Math.min(maxRatio, r)));
+
+    // Renormalize to sum to 1
+    const sum = adjusted.reduce((a, b) => a + b, 0);
+    if (sum > 0) {
+        adjusted = adjusted.map(r => r / sum);
+    }
+
+    return adjusted;
+}
+
+/**
+ * SplitViewReader Component
+ *
+ * A specialized liturgical reader that takes a set of text lines and paginates them
+ * dynamically to fit within a specific height. It supports single, dual, and triple
+ * column layouts with DYNAMIC column widths based on actual content length.
+ *
+ * Integrated rows ensure that Arabic, Coptic Arabized, and Coptic Script texts
+ * stay together as a single unit during pagination.
+ */
 export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderProps>(
     (
         {
@@ -105,14 +416,90 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
         },
         ref
     ) => {
+        // Track the current page index within the split content
         const [currentPage, setCurrentPage] = useState(initialPage);
+        // Stores the lines grouped into pages after pagination logic runs
         const [pages, setPages] = useState<Line[][]>(lines?.length ? [lines] : []);
+        // Reference to the root element for dynamic width measurement
         const measureRootRef = useRef<HTMLDivElement>(null);
+        // Current width of the container, used to calculate line breaks during pagination
         const [contentWidthPx, setContentWidthPx] = useState(0);
 
+        // Store integrated rows for rendering (ensures Arabic + Coptic Arabized + Coptic stay together)
+        const [integratedRows, setIntegratedRows] = useState<IntegratedRow[]>([]);
+
+        // Detect if Coptic script characters are present in the text
         const hasCopticScript = useMemo(() => linesHaveCopticScript(lines ?? []), [lines]);
+        // Determine the column layout mode (single, dual, triple)
         const columnMode: MultiColumnMode = resolveMultiColumnMode(hasCoptic ?? false, hasCopticScript);
 
+        // Check if we're in multi-column mode (dual or triple)
+        const isMultiColumn = columnMode === 'dual' || columnMode === 'triple';
+
+        /**
+         * Group lines into integrated rows whenever the input lines change.
+         * This is the foundation for keeping all language versions together.
+         */
+        useEffect(() => {
+            if (!lines || lines.length === 0) {
+                setIntegratedRows([]);
+                return;
+            }
+
+            const rows = groupIntoIntegratedRows(lines);
+            setIntegratedRows(rows);
+        }, [lines]);
+
+        /**
+         * Cache for dynamic column ratios for the current page.
+         * Recalculated whenever the current page content changes.
+         */
+        const [dynamicRatios, setDynamicRatios] = useState<number[]>([]);
+
+        /**
+         * Calculate dynamic column ratios whenever the current page content changes.
+         * This ensures each page has optimal column widths based on its actual content.
+         */
+        useEffect(() => {
+            const currentLinesList = pages[currentPage] || [];
+            if (!currentLinesList.length || columnMode === 'single') {
+                // Single column mode always uses 100% width
+                setDynamicRatios([1]);
+                return;
+            }
+
+            // Extract texts from each column based on available content
+            const arabicTexts = currentLinesList.filter(l => l.lang_type === 'arabic').map(l => l.text);
+            const arcopticTexts = currentLinesList.filter(l => l.lang_type === 'coptic_arabized').map(l => l.text);
+            const copticTexts = currentLinesList.filter(l => l.lang_type === 'coptic').map(l => l.text);
+
+            // Combine all texts in each column for ratio calculation
+            const combinedArabic = arabicTexts.join(' ');
+            const combinedArcoptic = arcopticTexts.join(' ');
+            const combinedCoptic = copticTexts.join(' ');
+
+            const isTriple = columnMode === 'triple' && combinedCoptic.trim().length > 0;
+            const isDual = columnMode === 'dual' || (columnMode === 'triple' && !isTriple);
+
+            if (isTriple) {
+                // Three columns: calculate ratios for all three
+                const ratios = calculateDynamicRatios([combinedArabic, combinedArcoptic, combinedCoptic]);
+                setDynamicRatios(ratios);
+            } else if (isDual) {
+                // Two columns: calculate ratios for Arabic and Coptic Arabized
+                const ratios = calculateDynamicRatios([combinedArabic, combinedArcoptic]);
+                // Ensure we have exactly 2 ratios (pad with 0 if needed)
+                setDynamicRatios(ratios.length >= 2 ? [ratios[0], ratios[1]] : [0.5, 0.5]);
+            } else {
+                // Single column fallback
+                setDynamicRatios([1]);
+            }
+        }, [pages, currentPage, columnMode]);
+
+        /**
+         * Use ResizeObserver to keep track of the container's width.
+         * This is critical because pagination results depend on the available width for text.
+         */
         useLayoutEffect(() => {
             const el = measureRootRef.current;
             if (!el || typeof ResizeObserver === 'undefined') {
@@ -151,6 +538,12 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
             }
         }, [initialPage]);
 
+        /**
+         * The core pagination effect. Triggered whenever the content (lines),
+         * layout constraints (maxHeight, fontSize), or container width change.
+         *
+         * Uses integrated rows to ensure all language versions stay together.
+         */
         useEffect(() => {
             setCurrentPage(0);
 
@@ -160,23 +553,73 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
                 return;
             }
 
+            // Calculate the width for measurement, falling back to window width if necessary
             const widthForMeasure = Math.max(
                 280,
                 contentWidthPx || (typeof window !== 'undefined' ? window.innerWidth - 64 : 960)
             );
+
+            // Apply a small tolerance to the height to avoid strictly cutting off lines
             const tolerance = paginationTolerancePx(maxContentHeight);
+
+            // Initialise the paginator which uses a hidden DOM sandbox for height measurement
             const paginator = new TextPaginator('slide-content-enter', fontSizePx, widthForMeasure);
             paginator.setContentWidth(widthForMeasure);
 
+            /**
+             * Adapter to bridge the generic computeSlidePages logic with the
+             * DOM-based height measurements provided by TextPaginator.
+             */
             const measureAdapter = {
                 arabicParagraph: (t: string) => paginator.measureArabicParagraphHeight(t),
-                dualRow: (ar: string, copAr: string) => paginator.measureDualColumnRowHeight(ar, copAr),
-                tripleRow: (ar: string, copAr: string, cop: string) =>
-                    paginator.measureTripleColumnRowHeight(ar, copAr, cop),
+                dualRow: (ar: string, copAr: string) => paginator.measureFullRowHeight(ar, copAr, '', false),
+                tripleRow: (ar: string, copAr: string, cop: string) => paginator.measureFullRowHeight(ar, copAr, cop, true),
+                fullRowHeight: (ar: string, copAr: string, cop: string, triple: boolean) =>
+                    paginator.measureFullRowHeight(ar, copAr, cop, triple),
+                measureRowWithRatios: (ar: string, copAr: string, cop: string, triple: boolean, ratios: number[]) =>
+                    paginator.measureRowWithRatios(ar, copAr, cop, triple, ratios),
+                findBalancedRatios: (ar: string, copAr: string, cop: string, triple: boolean) =>
+                    paginator.findBalancedRatios(ar, copAr, cop, triple),
+                splitFullRowSynchronizedWithRatios: (
+                    ar: string, copAr: string, cop: string, triple: boolean, maxH: number, ratios: number[]
+                ) => paginator.splitFullRowSynchronizedWithRatios(ar, copAr, cop, triple, maxH, ratios),
             };
 
+            // For multi-column mode, we need to work with integrated rows to ensure
+            // all language versions stay together during pagination
+            let linesForPagination: Line[];
+
+            if (isMultiColumn && integratedRows.length > 0) {
+                // First, check if any integrated row needs splitting
+                let processedRows: IntegratedRow[] = [];
+
+                for (const row of integratedRows) {
+                    const rowHasContent = row.arabic.text.trim() || row.copticArabized.text.trim() || (row.copticScript?.text || '').trim();
+                    if (!rowHasContent) continue;
+
+                    // Check if this row needs to be split
+                    const rowHeight = columnMode === 'triple' && row.copticScript?.text?.trim()
+                        ? measureAdapter.tripleRow(row.arabic.text, row.copticArabized.text, row.copticScript.text || '')
+                        : measureAdapter.dualRow(row.arabic.text, row.copticArabized.text);
+
+                    if (rowHeight > maxContentHeight - 100) { // Leave some buffer
+                        // Split the row using sentence-aware splitting
+                        const splitRows = splitIntegratedRow(row, maxContentHeight - 100, measureAdapter, paginator);
+                        processedRows.push(...splitRows);
+                    } else {
+                        processedRows.push(row);
+                    }
+                }
+
+                // Flatten the processed rows for pagination
+                linesForPagination = flattenIntegratedRows(processedRows);
+            } else {
+                linesForPagination = lines;
+            }
+
+            // Recursively split lines into pages that fit the maxContentHeight
             const computedPages = computeSlidePages(
-                lines,
+                linesForPagination,
                 columnMode,
                 maxContentHeight,
                 tolerance,
@@ -185,11 +628,12 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
                 (text, maxH) => paginator.paginate(text, maxH)
             );
 
+            // Important: Clean up the measurement sandbox element from the document body
             paginator.cleanup();
-            const finalPages = computedPages.length > 0 ? computedPages : [lines];
+            const finalPages = computedPages.length > 0 ? computedPages : [linesForPagination];
             setPages(finalPages);
             emitMeta(0, finalPages);
-        }, [lines, columnMode, maxContentHeight, fontSizePx, contentWidthPx, emitMeta]);
+        }, [lines, integratedRows, columnMode, isMultiColumn, maxContentHeight, fontSizePx, contentWidthPx, emitMeta]);
 
         useEffect(() => {
             emitMeta(currentPage, pages);
@@ -225,16 +669,22 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
         const currentLines = pages[currentPage] || [];
         const isLastPage = pages.length === 0 || currentPage === pages.length - 1;
 
+        /**
+         * Determines the color and background styles for different speakers.
+         *
+         * @param speaker The speaker name
+         * @returns CSS class string
+         */
         const getSpeakerStyles = (speaker?: string) => {
             if (!speaker) return '';
             const s = speaker.trim();
-            if (s.includes('الكاهن')) {
+            if (s.includes('الكاهن')) { // Priest
                 return 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-800';
             }
-            if (s.includes('الشعب')) {
+            if (s.includes('الشعب')) { // People/Congregation
                 return 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800';
             }
-            if (s.includes('الشماس')) {
+            if (s.includes('الشماس')) { // Deacon
                 return 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800';
             }
             return 'bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700';
@@ -242,6 +692,13 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
 
         const hasText = (obj: Line | null | undefined) => obj && obj.text && obj.text.trim().length > 0;
 
+        /**
+         * Renders the speaker badge bar, optimized for different layout modes.
+         * The speaker is ALWAYS displayed above the text for better readability.
+         *
+         * @param currentSpeaker The name of the current speaker
+         * @param compact Whether to use a more compact vertical margin
+         */
         const renderSpeakerBar = (currentSpeaker: string, compact: boolean) => {
             const isDual = columnMode === 'dual';
 
@@ -285,7 +742,37 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
             );
         };
 
+        /**
+         * Gets inline style object for dynamic column width.
+         *
+         * @param columnIndex Index of the column (0, 1, or 2)
+         * @returns React.CSSProperties object with flex-basis set
+         */
+        const getColumnWidthStyle = (columnIndex: number): React.CSSProperties => {
+            if (dynamicRatios.length <= columnIndex) return {};
+            const ratio = dynamicRatios[columnIndex];
+            if (ratio === 1) return { flexBasis: '100%' };
+            if (ratio <= 0) return { display: 'none' };
+            return { flexBasis: `${ratio * 100}%` };
+        };
+
+        // Single column mode: display each line sequentially with speaker above
         if (columnMode === 'single') {
+            // Group single column lines by speaker to show speaker bar only once per speaker block
+            const groupedBySpeaker: { speaker: string | null; lines: Line[] }[] = [];
+            let currentGroup: { speaker: string | null; lines: Line[] } | null = null;
+
+            for (const line of currentLines) {
+                const lineSpeaker = line.speaker || null;
+                if (!currentGroup || currentGroup.speaker !== lineSpeaker) {
+                    if (currentGroup) groupedBySpeaker.push(currentGroup);
+                    currentGroup = { speaker: lineSpeaker, lines: [line] };
+                } else {
+                    currentGroup.lines.push(line);
+                }
+            }
+            if (currentGroup) groupedBySpeaker.push(currentGroup);
+
             return (
                 <div
                     ref={measureRootRef}
@@ -294,7 +781,7 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
                         className
                     )}
                 >
-                    {/* المقدمة — تظهر فقط في الصفحة الأولى */}
+                    {/* Intonation section — only visible on the first page of the slide set */}
                     {intonation && currentPage === 0 && (
                         <div className="flex w-full items-center gap-2 my-1.5">
                             <div className="h-px flex-1 bg-gradient-to-l from-transparent to-muted-foreground/30" />
@@ -305,33 +792,32 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
                         </div>
                     )}
 
-                    {currentLines.map((line, index) => {
-                        const prevSpeaker = index > 0 ? currentLines[index - 1].speaker : null;
-                        const shouldShowSpeaker = line.speaker && line.speaker !== prevSpeaker;
-                        const isCopticScript = line.lang_type === 'coptic';
+                    {groupedBySpeaker.map((group, groupIdx) => (
+                        <div key={`group-${groupIdx}`} className="flex flex-col space-y-2">
+                            {/* Speaker bar appears above the first line of each speaker group */}
+                            {group.speaker && !chromaMode && renderSpeakerBar(group.speaker, true)}
 
-                        return (
-                            <div
-                                key={`${currentPage}-${line.id}-${index}`}
-                                className="animate-in fade-in slide-in-from-bottom-2 flex flex-col space-y-2 duration-500"
-                            >
-                                {shouldShowSpeaker && line.speaker && !chromaMode && renderSpeakerBar(line.speaker, true)}
-                                <p
-                                    className={bodyParagraphClassNames(
-                                        justified,
-                                        chromaMode ? 'text-white' : 'text-foreground',
-                                        true,
-                                        isCopticScript,
-                                        chromaMode
-                                    )}
-                                    dir={isCopticScript ? 'ltr' : 'rtl'}
-                                    dangerouslySetInnerHTML={lineHtml(line, highlightQuery)}
-                                />
-                            </div>
-                        );
-                    })}
+                            {group.lines.map((line, lineIdx) => {
+                                const isCopticScript = line.lang_type === 'coptic';
+                                return (
+                                    <p
+                                        key={`${currentPage}-${line.id}-${lineIdx}`}
+                                        className={bodyParagraphClassNames(
+                                            justified,
+                                            chromaMode ? 'text-white' : 'text-foreground',
+                                            true,
+                                            isCopticScript,
+                                            chromaMode
+                                        )}
+                                        dir={isCopticScript ? 'ltr' : 'rtl'}
+                                        dangerouslySetInnerHTML={lineHtml(line, highlightQuery)}
+                                    />
+                                );
+                            })}
+                        </div>
+                    ))}
 
-                    {/* الخاتمة — تظهر فقط في الصفحة الأخيرة */}
+                    {/* Conclusion section — only visible on the last page of the slide set */}
                     {conclusion && isLastPage && (
                         <div className="flex w-full items-center gap-2 my-1.5">
                             <div className="h-px flex-1 bg-gradient-to-l from-transparent to-muted-foreground/30" />
@@ -345,15 +831,12 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
             );
         }
 
-        const arabicLines = currentLines.filter((l) => l.lang_type === 'arabic');
-        const arcopticLines = currentLines.filter((l) => l.lang_type === 'coptic_arabized');
-        const copticLines = currentLines.filter((l) => l.lang_type === 'coptic');
-
-        const pairedLines: (Line | null)[][] = [];
-        const maxLen = Math.max(arabicLines.length, copticLines.length, arcopticLines.length);
-        for (let i = 0; i < maxLen; i++) {
-            pairedLines.push([arabicLines[i] || null, arcopticLines[i] || null, copticLines[i] || null]);
-        }
+        // Multi-column mode (dual or triple)
+        // Group currentLines into integrated rows for rendering
+        const currentIntegratedRows = useMemo(() => {
+            if (!currentLines.length) return [];
+            return groupIntoIntegratedRows(currentLines);
+        }, [currentLines]);
 
         const isTriple = columnMode === 'triple';
 
@@ -365,7 +848,7 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
                     className
                 )}
             >
-                {/* المقدمة — تظهر فقط في الصفحة الأولى */}
+                {/* Intonation section — only visible on the first page of the multi-column layout */}
                 {intonation && currentPage === 0 && (
                     <div className="flex w-full items-center gap-2 my-1.5">
                         <div className="h-px flex-1 bg-gradient-to-l from-transparent to-muted-foreground/30" />
@@ -376,19 +859,15 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
                     </div>
                 )}
 
-                {pairedLines.map(([ar, arcop, cop], index) => {
-                    const showAr = hasText(ar);
-                    const showArcop = hasText(arcop);
-                    const showCop = hasText(cop);
+                {currentIntegratedRows.map((row, index) => {
+                    const showAr = hasText(row.arabic);
+                    const showArcop = hasText(row.copticArabized);
+                    const showCop = isTriple && hasText(row.copticScript);
 
-                    const currentSpeaker = ar?.speaker || arcop?.speaker || cop?.speaker;
+                    const currentSpeaker = row.speaker;
 
-                    const previousLine = index > 0 ? pairedLines[index - 1] : null;
-                    const previousSpeaker = previousLine
-                        ? previousLine[0]?.speaker ||
-                          previousLine[1]?.speaker ||
-                          previousLine[2]?.speaker
-                        : null;
+                    const previousRow = index > 0 ? currentIntegratedRows[index - 1] : null;
+                    const previousSpeaker = previousRow?.speaker;
 
                     const shouldShowSpeaker = currentSpeaker && currentSpeaker !== previousSpeaker;
 
@@ -396,15 +875,19 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
                         return null;
                     }
 
-                    const useThreeColLayout = isTriple && showCop;
+                    // Get dynamic width styles for each column
+                    const arStyle = getColumnWidthStyle(0);
+                    const arcopStyle = getColumnWidthStyle(1);
+                    const copStyle = isTriple ? getColumnWidthStyle(2) : {};
 
                     return (
                         <div
-                            key={`p${currentPage}-row-${index}`}
+                            key={`p${currentPage}-row-${row.id}-${index}`}
                             className="flex flex-col space-y-2"
                             style={{ animationDelay: `${index * 0.05}s` }}
                         >
-                            {shouldShowSpeaker && currentSpeaker && renderSpeakerBar(currentSpeaker, false)}
+                            {/* Speaker bar appears above the entire integrated row */}
+                            {shouldShowSpeaker && currentSpeaker && !chromaMode && renderSpeakerBar(currentSpeaker, false)}
 
                             <div
                                 className={cn(
@@ -412,12 +895,11 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
                                     rowGapClass
                                 )}
                             >
-                                {showAr && ar && (
+                                {/* Arabic Column */}
+                                {showAr && (
                                     <div
-                                        className={cn(
-                                            'min-w-0 shrink-0 basis-full',
-                                            useThreeColLayout ? 'md:basis-[30%]' : 'md:basis-[40%]'
-                                        )}
+                                        className="min-w-0 shrink-0 basis-full md:basis-auto"
+                                        style={arStyle}
                                     >
                                         <p
                                             className={bodyParagraphClassNames(
@@ -428,24 +910,29 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
                                                 chromaMode
                                             )}
                                             dir="rtl"
-                                            dangerouslySetInnerHTML={lineHtml(ar, highlightQuery)}
+                                            dangerouslySetInnerHTML={lineHtml(row.arabic, highlightQuery)}
                                         />
                                     </div>
                                 )}
 
-                                {showAr && (showArcop || (useThreeColLayout && showCop)) && (
+                                {/* Empty placeholder when Arabic is missing but others exist */}
+                                {!showAr && (showArcop || showCop) && (
+                                    <div className="min-w-0 shrink-0 basis-full md:basis-auto" style={arStyle} />
+                                )}
+
+                                {/* Vertical Divider between Arabic and Coptic Arabized */}
+                                {(showAr || !showAr) && (showArcop || showCop) && (
                                     <div
                                         className="hidden md:block w-px shrink-0 self-stretch min-h-0 bg-black/25 dark:bg-white/25"
                                         aria-hidden="true"
                                     />
                                 )}
 
-                                {showArcop && arcop && (
+                                {/* Coptic Arabized Column */}
+                                {showArcop && (
                                     <div
-                                        className={cn(
-                                            'min-w-0 shrink-0 basis-full',
-                                            useThreeColLayout ? 'md:basis-[35%]' : 'md:basis-[60%]'
-                                        )}
+                                        className="min-w-0 shrink-0 basis-full md:basis-auto"
+                                        style={arcopStyle}
                                     >
                                         <p
                                             className={bodyParagraphClassNames(
@@ -458,20 +945,25 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
                                                 chromaMode
                                             )}
                                             dir="rtl"
-                                            dangerouslySetInnerHTML={lineHtml(arcop, highlightQuery)}
+                                            dangerouslySetInnerHTML={lineHtml(row.copticArabized, highlightQuery)}
                                         />
                                     </div>
                                 )}
 
-                                {useThreeColLayout && (showAr || showArcop) && showCop && (
+                                {/* Vertical Divider between Coptic Arabized and Coptic Script (triple column only) */}
+                                {isTriple && (showArcop || showAr) && showCop && (
                                     <div
                                         className="hidden md:block w-px shrink-0 self-stretch min-h-0 bg-black/25 dark:bg-white/25"
                                         aria-hidden="true"
                                     />
                                 )}
 
-                                {useThreeColLayout && showCop && cop && (
-                                    <div className="min-w-0 shrink-0 basis-full break-words md:basis-[35%]">
+                                {/* Coptic Script Column (triple column only) */}
+                                {isTriple && showCop && row.copticScript && (
+                                    <div
+                                        className="min-w-0 shrink-0 basis-full break-words md:basis-auto"
+                                        style={copStyle}
+                                    >
                                         <p
                                             className={bodyParagraphClassNames(
                                                 justified,
@@ -481,7 +973,7 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
                                                 chromaMode
                                             )}
                                             dir="ltr"
-                                            dangerouslySetInnerHTML={lineHtml(cop, highlightQuery)}
+                                            dangerouslySetInnerHTML={lineHtml(row.copticScript, highlightQuery)}
                                         />
                                     </div>
                                 )}
@@ -490,7 +982,7 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
                     );
                 })}
 
-                {/* الخاتمة — تظهر فقط في الصفحة الأخيرة */}
+                {/* Conclusion section — only visible on the last page of the multi-column layout */}
                 {conclusion && isLastPage && (
                     <div className="flex w-full items-center gap-2 my-1.5">
                         <div className="h-px flex-1 bg-gradient-to-l from-transparent to-muted-foreground/30" />

@@ -1,17 +1,31 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { router } from '@inertiajs/react';
 
+/**
+ * State for the global Liturgical Day context.
+ * Drives the content displayed throughout the app based on the Coptic calendar.
+ */
 interface DayContextState {
+    /** The Gregorian date string (e.g., '2024-03-23') */
     selectedDate: string;
+    /** The resolved Coptic date string (e.g., '14 Baramhat 1740') */
     resolvedCopticDate: string;
+    /** The liturgical season (e.g., 'The Great Fast') */
     resolvedSeason: string;
+    /** Array of liturgical readings (Gospel, Epistles, etc.) for the day */
     resolvedReadings: any[];
+    /** Updates the global context with new liturgical data */
     setDateContext: (date: string, coptic: string, season: string, readings: any[]) => void;
+    /** Triggers a navigation to change the active date */
     changeDate: (newDate: string) => void;
 }
 
 const DayContext = createContext<DayContextState | undefined>(undefined);
 
+/**
+ * Provides liturgical date context to the entire application.
+ * Persists the selected date in LocalStorage to maintain continuity.
+ */
 export function DayProvider({ children }: { children: React.ReactNode }) {
     const [selectedDate, setSelectedDate] = useState<string>('');
     const [resolvedCopticDate, setResolvedCopticDate] = useState<string>('');
@@ -52,6 +66,10 @@ export function DayProvider({ children }: { children: React.ReactNode }) {
     );
 }
 
+/**
+ * Custom hook to access the DayContext.
+ * Must be used within a DayProvider.
+ */
 export function useDayContext() {
     const context = useContext(DayContext);
     if (!context) {

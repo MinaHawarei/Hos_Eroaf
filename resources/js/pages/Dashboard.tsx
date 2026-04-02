@@ -17,29 +17,50 @@ import { router } from '@inertiajs/react';
 import { useDayContext } from '@/contexts/DayContext';
 
 // Types from the controller
+/**
+ * Represents a section of liturgical readings (e.g., Pauline, Gospel).
+ */
 type ReadingSection = {
+    /** Primary key for the section */
     id: number;
+    /** Unique string code for the section */
     code: string;
+    /** Arabic name of the section */
     name_ar: string;
+    /** Number of reading items/slides in this section */
     reading_count: number;
 };
 
+/**
+ * Props for the Dashboard component.
+ */
 type Props = {
+    /** Detailed Coptic date information */
     copticDate: {
         day: number;
         month: string;
         year: number;
+        /** Full formatted string (e.g., "17 Meshir 1740") */
         formatted: string;
     };
+    /** Formatted Gregorian date string */
     gregorianDate: string;
+    /** Date string in ISO format for processing */
     gregorianDateISO: string;
+    /** Technical key for the current liturgical season */
     season: string;
+    /** Human-readable label for the season */
     seasonLabel: string;
+    /** Unique key identifying the liturgical day for syncing */
     dayKey: string;
+    /** Name of the current day in the liturgical calendar */
     dayName: string;
 };
 
-// Map season keys to icons and colors
+/**
+ * Visual styling configurations for different liturgical seasons.
+ * Adjusts gradients, icons, and badge colors to match the seasonal mood.
+ */
 const seasonStyles: Record<string, { icon: any; gradient: string; badge: string }> = {
     annual: {
         icon: Sun,
@@ -68,6 +89,12 @@ const seasonStyles: Record<string, { icon: any; gradient: string; badge: string 
     },
 };
 
+/**
+ * Dashboard Component
+ * 
+ * The main landing page for users. Displays the current Coptic calendar date, 
+ * seasonal context, and provides navigation to the lectionary, liturgy, and other modules.
+ */
 export default function Dashboard({
     copticDate,
     gregorianDate,
@@ -78,6 +105,8 @@ export default function Dashboard({
     dayName
 }: Props) {
     const { setDateContext } = useDayContext();
+    
+    /** Selects the appropriate visual theme based on the current season */
     const currentSeasonStyle = useMemo(() => {
         return seasonStyles[season] || seasonStyles.annual;
     }, [season]);
@@ -109,7 +138,7 @@ export default function Dashboard({
                             </div>
 
                             <h1 className="text-2xl font-bold text-foreground sm:text-3xl">
-                                قراءات اليوم
+                                Today&apos;s Readings
                             </h1>
 
                             <div className="flex flex-col gap-1.5">
@@ -142,7 +171,7 @@ export default function Dashboard({
                                     className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:opacity-90 hover:shadow-md active:scale-[0.98]"
                                 >
                                     <BookOpen className="h-4 w-4" />
-                                    فتح القراءات
+                                    Read Online
                                 </Link>
 
                                 <Link
@@ -150,7 +179,7 @@ export default function Dashboard({
                                     className="inline-flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400 px-4 py-2.5 text-sm font-semibold shadow-sm transition-all hover:bg-amber-500/20 active:scale-[0.98]"
                                 >
                                     <Sparkles className="h-4 w-4" />
-                                    عرض الكنيسة
+                                    Church Presentation
                                 </Link>
 
                                 <Link
@@ -158,7 +187,7 @@ export default function Dashboard({
                                     className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground shadow-sm transition-all hover:bg-muted active:scale-[0.98]"
                                 >
                                     <Mic className="h-4 w-4" />
-                                    بدء الاستماع
+                                    Audio Mode
                                 </Link>
                             </>
 
@@ -169,7 +198,7 @@ export default function Dashboard({
                 {/* Sections Grid */}
                 <div>
                     <h2 className="mb-4 text-lg font-semibold text-foreground">
-                        أقسام القراءات
+                        Liturgical Sections
                     </h2>
                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
 
@@ -190,13 +219,13 @@ export default function Dashboard({
                             </div>
 
                             {/* الجزء الأيسر: أزرار الأكشن */}
-                            <div className="flex items-center gap-1 w-full sm:w-auto shrink-0 border-t sm:border-t-0 pt-3 sm:pt-0">
+                             <div className="flex items-center gap-1 w-full sm:w-auto shrink-0 border-t sm:border-t-0 pt-3 sm:pt-0">
                                 <Link
                                     href={`/presentation/lectionary/${dayKey}`}
                                     className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400 px-2 py-2 text-sm font-bold shadow-sm transition-all hover:bg-amber-500/20 active:scale-[0.96]"
                                 >
                                     <Monitor className="h-4 w-4" />
-                                    <span>عرض</span>
+                                    <span>View</span>
                                 </Link>
 
                                 <Link
@@ -204,7 +233,7 @@ export default function Dashboard({
                                     className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1 rounded-xl border border-border bg-background px-2 py-2 text-sm font-medium text-foreground shadow-sm transition-all hover:bg-muted active:scale-[0.96]"
                                 >
                                     <Mic className="h-4 w-4" />
-                                    <span>استماع</span>
+                                    <span>Audio</span>
                                 </Link>
                             </div>
                         </div>
@@ -222,7 +251,7 @@ export default function Dashboard({
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-1 w-full sm:w-auto shrink-0 border-t sm:border-t-0 pt-3 sm:pt-0">
+                             <div className="flex items-center gap-1 w-full sm:w-auto shrink-0 border-t sm:border-t-0 pt-3 sm:pt-0">
                                 <Link
                                     href={`/presentation/liturgy`}
                                     data={{
@@ -234,7 +263,7 @@ export default function Dashboard({
                                     className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400 px-2 py-2 text-sm font-bold shadow-sm transition-all hover:bg-amber-500/20 active:scale-[0.96]"
                                 >
                                     <Monitor className="h-4 w-4" />
-                                    <span>عرض</span>
+                                    <span>View</span>
                                 </Link>
 
                                 <Link
@@ -242,7 +271,7 @@ export default function Dashboard({
                                     className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1 rounded-xl border border-border bg-background px-2 py-2 text-sm font-medium text-foreground shadow-sm transition-all hover:bg-muted active:scale-[0.96]"
                                 >
                                     <Mic className="h-4 w-4" />
-                                    <span>استماع</span>
+                                    <span>Audio</span>
                                 </Link>
                             </div>
                         </div>

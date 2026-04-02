@@ -22,11 +22,19 @@ import { useForm } from '@inertiajs/react';
 import Cookies from 'js-cookie';
 import { GitHubSyncService, SyncProgress } from '@/services/GitHubSyncService';
 
+/**
+ * Represents a member of the Coptic Clergy (Bishop or Metropolitan).
+ * Used for dynamic text replacement in liturgical prayers (e.g., Diptych).
+ */
 type Bishop = {
+    /** The name of the bishop (e.g., "Mina") */
     name: string;
-    role: string; // مطران أو أسقف
-    coRole: string; // أبيسكوبوس أو متروبوليتيس
-    DefNoun: string; // ان أو ام
+    /** Arabic role title: 'أسقف' (Bishop) or 'مطران' (Metropolitan) */
+    role: string;
+    /** Coptic-derived role title: 'أبيسكوبوس' or 'متروبوليتيس' */
+    coRole: string;
+    /** Definite noun/article used in liturgical phrasing (e.g., 'ان' or 'ام') */
+    DefNoun: string;
 };
 
 type Props = {
@@ -72,11 +80,20 @@ export default function Settings({
         baseFontSize: Number(Cookies.get('baseFontSize')) || 28
     });
 
+    /**
+     * Maps the Arabic role to its Coptic-derived equivalent.
+     * @param role - 'مطران' (Metropolitan) or 'أسقف' (Bishop)
+     */
     const getCoRole = (role: string) => {
         if (role === 'مطران') return 'متروبوليتيس';
         if (role === 'أسقف') return 'أبيسكوبوس';
         return 'أبيسكوبوس';
     };
+
+    /**
+     * Determines the liturgical definite noun suffix based on the role.
+     * Used for grammatical correctness in prayers.
+     */
     const getDefNoun = (role: string) => {
         if (role === 'مطران') return 'ام';
         if (role === 'أسقف') return 'ان ';
@@ -93,10 +110,14 @@ export default function Settings({
         });
     };
 
+    /**
+     * Persists church settings (Clergy names, Patron) to both 
+     * client-side cookies and the server-side database.
+     */
     const handleSaveChurchData = (e: React.FormEvent) => {
         e.preventDefault();
 
-        // Save to js-cookie for immediate UI availability
+        // Save to js-cookie for immediate UI availability across components
         const dataToSave = {
             patron: data.patron,
             popename: data.popename,
@@ -107,9 +128,10 @@ export default function Settings({
         Cookies.set('church_settings', JSON.stringify(dataToSave), { expires: 365, path: '/' });
         Cookies.set('baseFontSize', data.baseFontSize.toString(), { expires: 365, path: '/' });
 
-        // Update the useForm data in case we toggled off visiting bishops so it sends an empty array
+        // Update the useForm data state
         setData('visiting_bishops', dataToSave.visiting_bishops);
 
+        // API call to persist settings on the server
         post(route('settings.update-church'), {
             preserveScroll: true,
         });
@@ -134,12 +156,17 @@ export default function Settings({
         setData('visiting_bishops', newBishops);
     };
 
+    /**
+     * Connects to GitHubSyncService to check for and apply content updates.
+     * Manages a multi-stage sync progress state (checking -> syncing -> completed).
+     */
     const checkForUpdates = async () => {
         setCheckingUpdates(true);
         setUpdateResult(null);
         try {
             const syncService = new GitHubSyncService();
 
+            // Progress callback to update UI during large downloads
             syncService.onProgress = (progress) => {
                 if (progress.status === 'downloading') {
                     setUpdateResult('syncing');
@@ -157,6 +184,7 @@ export default function Settings({
 
             setUpdateResult('syncing');
 
+            // Perform the full file-by-file synchronization
             const updatedVersion = await syncService.performSync();
             setLocalVersionInfo(updatedVersion);
             setUpdateResult('completed');
@@ -184,8 +212,8 @@ export default function Settings({
                         <SettingsIcon className="h-5 w-5" />
                     </div>
                     <div>
-                        <h1 className="text-xl font-bold text-foreground">الإعدادات</h1>
-                        <p className="text-sm text-muted-foreground">تخصيص التطبيق وبيانات الطقس</p>
+                        <h1 className="text-xl font-bold text-foreground">Settings</h1>
+                        <p className="text-sm text-muted-foreground">Customize application and liturgical data</p>
                     </div>
                 </div>
 
@@ -193,13 +221,13 @@ export default function Settings({
                 <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
                     <h2 className="mb-4 flex items-center gap-2 text-base font-semibold text-foreground">
                         <User className="h-4.5 w-4.5 text-primary" />
-                        بيانات الكنيسة والآباء
+                        Church & Clergy Details
                     </h2>
 
                     <form onSubmit={handleSaveChurchData} className="space-y-4">
                         {/* Church Patron */}
                         <div className="space-y-1.5">
-                            <label className="text-sm font-medium text-muted-foreground">شفيع الكنيسة</label>
+                            <label className="text-sm font-medium text-muted-foreground">Church Patron Saint</label>
                             <div className="relative">
                                 <select
                                     value={data.patron}
@@ -216,7 +244,7 @@ export default function Settings({
 
                         {/* Pope Name */}
                         <div className="space-y-1.5">
-                            <label className="text-sm font-medium text-muted-foreground">اسم البطريرك</label>
+                            <label className="text-sm font-medium text-muted-foreground">Pope Name</label>
                             <input
                                 type="text"
                                 value={data.popename}
@@ -228,11 +256,11 @@ export default function Settings({
 
                         {/* Diocesan Bishop */}
                         <div className="rounded-xl border border-border/60 bg-muted/10 p-4 space-y-4">
-                            <h3 className="text-sm font-bold text-foreground">أسقف الإيبارشية / رئيس الدير</h3>
+                            <h3 className="text-sm font-bold text-foreground">Diocesan Bishop / Abbot</h3>
 
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="space-y-1.5">
-                                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">الرتبة</label>
+                                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Role</label>
                                     <select
                                         value={data.diocesan_bishop.role}
                                         onChange={e => handleDiocesanRoleChange(e.target.value)}
@@ -243,7 +271,7 @@ export default function Settings({
                                     </select>
                                 </div>
                                 <div className="space-y-1.5">
-                                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">اللقب الكنسي</label>
+                                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Liturgical Title</label>
                                     <input
                                         type="text"
                                         disabled
@@ -260,7 +288,7 @@ export default function Settings({
                             </div>
 
                             <div className="space-y-1.5">
-                                <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">اسم الأب</label>
+                                <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Father&apos;s Name</label>
                                 <input
                                     type="text"
                                     value={data.diocesan_bishop.name}
@@ -274,8 +302,8 @@ export default function Settings({
                         {/* Visiting Bishops Toggle */}
                         <div className="flex items-center justify-between rounded-xl bg-muted/20 p-3 border border-border/50">
                             <div className="flex flex-col">
-                                <span className="text-sm font-medium text-foreground">الأساقفة الحاضرون (ضيوف)</span>
-                                <span className="text-xs text-muted-foreground">تفعيل لإضافة آباء آخرين حاضرين</span>
+                                <span className="text-sm font-medium text-foreground">Visiting Bishops</span>
+                                <span className="text-xs text-muted-foreground">Enable to add other present clergy</span>
                             </div>
                             <button
                                 type="button"
@@ -356,7 +384,7 @@ export default function Settings({
                             disabled={processing}
                             className={`w-full rounded-xl py-3 text-sm font-bold text-primary-foreground shadow-md transition-all ${recentlySuccessful ? 'bg-emerald-600' : 'bg-primary hover:opacity-90 active:scale-[0.98]'}`}
                         >
-                            {processing ? 'جاري الحفظ...' : recentlySuccessful ? 'تم الحفظ بنجاح ✓' : 'حفظ إعدادات الكنيسة'}
+                            {processing ? 'Saving...' : recentlySuccessful ? 'Saved successfully ✓' : 'Save Church Settings'}
                         </button>
                     </form>
                 </section>
@@ -365,7 +393,7 @@ export default function Settings({
                 <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
                     <h2 className="mb-4 flex items-center gap-2 text-base font-semibold text-foreground">
                         <Monitor className="h-4.5 w-4.5 text-primary" />
-                        إعدادات العرض
+                        Display Settings
                     </h2>
 
                     <div className="space-y-4">
@@ -373,7 +401,7 @@ export default function Settings({
                             <div className="flex items-center justify-between">
                                 <label className="text-sm font-medium text-foreground flex items-center gap-2">
                                     <Type className="h-4 w-4 text-muted-foreground" />
-                                    حجم الخط الأساسي للعرض
+                                    Base Font Size (Presentation)
                                 </label>
                                 <span className="text-sm font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-lg">
                                     {data.baseFontSize}px
@@ -410,14 +438,14 @@ export default function Settings({
                 <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
                     <h2 className="mb-4 flex items-center gap-2 text-base font-semibold text-foreground">
                         <Download className="h-4.5 w-4.5 text-primary" />
-                        تحديث المحتوى
+                        Content Updates
                     </h2>
 
                     <div className="space-y-4">
                         <div className="flex items-center justify-between rounded-xl bg-muted/50 px-4 py-3">
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                 <Clock className="h-4 w-4" />
-                                <span>آخر تحديث:</span>
+                                <span>Last Updated:</span>
                             </div>
                             <span className="text-sm font-medium text-foreground">
                                 {localVersionInfo?.last_updated || lastUpdated || 'لم يتم التحديث بعد'}
@@ -428,7 +456,7 @@ export default function Settings({
                             <div className="flex items-center justify-between rounded-xl bg-muted/50 px-4 py-3">
                                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                     <BookOpen className="h-4 w-4" />
-                                    <span>إصدار القراءات:</span>
+                                    <span>Readings Version:</span>
                                 </div>
                                 <span className="text-sm font-medium text-foreground">
                                     {localVersionInfo?.version || currentReadingsVersion}
@@ -442,7 +470,7 @@ export default function Settings({
                             className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:opacity-90 disabled:opacity-60 active:scale-[0.98]"
                         >
                             <RefreshCw className={`h-4 w-4 ${checkingUpdates || updateResult === 'syncing' ? 'animate-spin' : ''}`} />
-                            {updateResult === 'syncing' ? 'جاري التزامن...' : checkingUpdates ? 'جاري التحقق...' : 'التحقق من التحديثات'}
+                            {updateResult === 'syncing' ? 'Syncing...' : checkingUpdates ? 'Checking...' : 'Check for Updates'}
                         </button>
 
                         {updateResult === 'syncing' && (
@@ -494,7 +522,7 @@ export default function Settings({
                 <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
                     <h2 className="mb-4 flex items-center gap-2 text-base font-semibold text-foreground">
                         <Info className="h-4.5 w-4.5 text-primary" />
-                        عن التطبيق
+                        About Application
                     </h2>
                     <div className="space-y-3">
                         <div className="flex items-center justify-between rounded-xl bg-muted/50 px-4 py-3 text-sm">
