@@ -8,6 +8,7 @@ import { SearchOverlay } from '@/components/SearchOverlay';
 import { Button } from '@/components/ui/button';
 import { splitLargeSlides, SplitResult } from '@/utils/splitLargeSlides';
 import { TextPaginator } from '@/utils/TextPaginator';
+import { cn } from '@/lib/utils';
 import {
     Search,
     Maximize,
@@ -233,13 +234,16 @@ export default function PresentationPage({
                 ? Math.floor(slotEl.getBoundingClientRect().height)
                 : Math.floor(window.innerHeight * 0.75);
             let availableHeight = Math.max(300, measuredHeight);
-            if (presentationMode === 'chroma') {
-                // Ensure text stays contained in the lower portion of the screen
-                const chromaConstraint = typeof window !== 'undefined'
-                    ? Math.max(150, window.innerHeight * 0.40)
-                    : 150;
-                availableHeight = Math.min(availableHeight, chromaConstraint);
-            }
+    if (presentationMode === 'chroma') {
+        // Ensure text block does not exceed 20% of the viewport height as per strict broadcast requirements
+        const chromaConstraint = typeof window !== 'undefined'
+            ? Math.max(120, window.innerHeight * 0.20)
+            : 120;
+        availableHeight = Math.min(availableHeight, chromaConstraint);
+    }
+
+    console.log(`Chroma mode: using ${availableHeight}px (${Math.round(window.innerHeight * 0.20)}px = 20% of ${window.innerHeight}px viewport)`);
+
 
             const result = await splitLargeSlides(
                 slidesProp,
@@ -558,15 +562,47 @@ export default function PresentationPage({
                         >
                             <Search className="h-4 w-4" />
                         </Button>
-                        <Button
-                            variant={presentationMode === 'chroma' ? 'default' : 'ghost'}
-                            size="icon"
-                            onClick={() => setPresentationMode(p => p === 'normal' ? 'chroma' : 'normal')}
-                            title={`نمط التقسيم: ${presentationMode === 'chroma' ? 'بث مباشر (Chroma)' : 'عادي (Normal)'}`}
-                            className="h-9 w-9 text-muted-foreground hover:text-foreground hover:bg-muted relative"
+                        {/* Mode Segmented Control */}
+                        <div
+                            className="relative flex items-center bg-muted/60 p-1 rounded-full border shadow-inner h-9 overflow-hidden"
+                            role="radiogroup"
+                            aria-label="نمط التجهيز والتقسيم"
                         >
-                            {presentationMode === 'chroma' ? <Tv className="h-4 w-4" /> : <TvMinimalPlay className="h-4 w-4" />}
-                        </Button>
+                            {/* Animated Background Pill */}
+                            <div
+                                className={cn(
+                                    "absolute top-1 bottom-1 w-[calc(50%-4px)] bg-background rounded-full shadow-sm border transition-transform duration-300 ease-out pointer-events-none",
+                                    presentationMode === 'normal' ? "translate-x-0" : "-translate-x-[calc(100%+4px)]"
+                                )}
+                            />
+
+                            <button
+                                role="radio"
+                                aria-checked={presentationMode === 'normal'}
+                                onClick={() => setPresentationMode('normal')}
+                                className={cn(
+                                    "relative z-10 flex-1 flex items-center justify-center gap-1.5 px-3 h-full text-xs font-bold rounded-full transition-colors outline-none",
+                                    presentationMode === 'normal' ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                                )}
+                                title="نمط عادي"
+                            >
+                                <TvMinimalPlay className="h-4 w-4" />
+                            </button>
+
+                            <button
+                                role="radio"
+                                aria-checked={presentationMode === 'chroma'}
+                                onClick={() => setPresentationMode('chroma')}
+                                className={cn(
+                                    "relative z-10 flex-1 flex items-center justify-center gap-1.5 px-3 h-full text-xs font-bold rounded-full transition-colors outline-none",
+                                    presentationMode === 'chroma' ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                                )}
+                                title="بث مباشر (Chroma)"
+                            >
+                                <Tv className="h-4 w-4" />
+                            </button>
+                        </div>
+
                         <Button
                             variant="ghost"
                             size="icon"

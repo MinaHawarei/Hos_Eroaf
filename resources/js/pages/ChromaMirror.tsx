@@ -52,6 +52,28 @@ function groupLinesIntoRows(lines: ChromaLine[]): ChromaRow[] {
     return rows;
 }
 
+// --- Dynamic Ratio Computation for Chroma Layout ---
+function getEffectiveTextLength(text: string): number {
+    if (!text) return 0;
+    return text.replace(/[\s\u0640\u061F\u060C\u061B\u061E\u066A-\u066D\u06D4]+/g, '').length;
+}
+
+function calculateDynamicRatios(texts: string[]): number[] {
+    const validTexts = texts.filter(t => t && t.trim().length > 0);
+    const columnCount = validTexts.length;
+    if (columnCount === 1) return texts.map(t => (t && t.trim().length > 0 ? 1 : 0));
+    const lengths = texts.map(t => getEffectiveTextLength(t || ''));
+    const totalLength = lengths.reduce((sum, len) => sum + len, 0);
+    if (totalLength === 0) return texts.map(() => 1 / texts.length);
+    let ratios = lengths.map(len => len / totalLength);
+    const minRatio = 0.20;
+    const maxRatio = 0.80;
+    let adjusted = ratios.map(r => Math.max(minRatio, Math.min(maxRatio, r)));
+    const sum = adjusted.reduce((a, b) => a + b, 0);
+    if (sum > 0) adjusted = adjusted.map(r => r / sum);
+    return adjusted;
+}
+
 /**
  * ChromaMirror Component
  *
@@ -133,8 +155,8 @@ export default function ChromaMirror() {
                         src="/icon.png"
                         alt="هوس إيروف"
                         style={{
-                            height: 160,
-                            width: 160,
+                            height: 128,
+                            width: 128,
                             objectFit: 'contain',
                             filter: 'drop-shadow(0 0 8px #000)',
                         }}
@@ -190,11 +212,33 @@ export default function ChromaMirror() {
     // Group lines into integrated rows
     const rows = groupLinesIntoRows(displayLines);
 
-    // Determine column count
-    const hasArabic = rows.some(r => r.arabic.trim().length > 0);
-    const hasCopticArabized = rows.some(r => r.copticArabized.trim().length > 0);
-    const hasCopticScript = rows.some(r => r.copticScript.trim().length > 0);
+    // Determine column count and dynamic ratios
+    let arText = '';
+    let copArText = '';
+    let copText = '';
+    rows.forEach(r => {
+        arText += r.arabic + ' ';
+        copArText += r.copticArabized + ' ';
+        copText += r.copticScript + ' ';
+    });
+
+    const hasArabic = arText.trim().length > 0;
+    const hasCopticArabized = copArText.trim().length > 0;
+    const hasCopticScript = copText.trim().length > 0;
     const columnCount = (hasArabic ? 1 : 0) + (hasCopticArabized ? 1 : 0) + (hasCopticScript ? 1 : 0);
+
+    const isTriple = hasArabic && hasCopticArabized && hasCopticScript;
+    const isDual = hasArabic && hasCopticArabized && !hasCopticScript;
+
+    // Default fallback ratios
+    let dynamicRatios = [0.42, 0.58, 0.40];
+    if (isTriple) {
+        dynamicRatios = calculateDynamicRatios([arText, copArText, copText]);
+    } else if (isDual) {
+        const dualRatios = calculateDynamicRatios([arText, copArText]);
+        dynamicRatios[0] = dualRatios[0];
+        dynamicRatios[1] = dualRatios[1];
+    }
 
     // Extract speaker from first line (post-split, each slide should have one speaker)
     const speaker = rows[0]?.speaker;
@@ -207,7 +251,9 @@ export default function ChromaMirror() {
         fontSize: `var(--pres-font-size, ${effectiveFontSize ?? 28}px)`,
         lineHeight: 1.55,
         textAlign: 'center',
-        wordBreak: 'break-word' as const,
+        whiteSpace: 'pre-wrap',
+        overflowWrap: 'break-word',
+        wordBreak: 'normal',
     };
 
     // Divider style: white line with black outline
@@ -272,8 +318,9 @@ export default function ChromaMirror() {
                     right: '4%',
                     zIndex: 10,
                     display: 'flex',
+                    flexDirection: 'column',
                     alignItems: 'center',
-                    gap: 8,
+                    gap: 6,
                 }}
             >
                 <img
@@ -336,11 +383,9 @@ export default function ChromaMirror() {
                     </>
                 )}
 
-                {/* Rows container — max height 150px */}
+                {/* Rows container */}
                 <div
                     style={{
-                        maxHeight: '150px',
-                        overflow: 'hidden',
                         width: '100%',
                     }}
                 >
@@ -379,7 +424,7 @@ export default function ChromaMirror() {
                                 }}
                             >
                                 {showAr && (
-                                    <div style={{ flex: '42', minWidth: 0 }}>
+                                    <div style={{ flex: dynamicRatios[0], minWidth: 0 }}>
                                         <p
                                             style={chromaTextStyle}
                                             dir="rtl"
@@ -395,7 +440,7 @@ export default function ChromaMirror() {
                                 )}
 
                                 {showArcop && (
-                                    <div style={{ flex: '58', minWidth: 0 }}>
+                                    <div style={{ flex: dynamicRatios[1], minWidth: 0 }}>
                                         <p
                                             style={chromaTextStyle}
                                             dir="rtl"
@@ -411,7 +456,7 @@ export default function ChromaMirror() {
                                 )}
 
                                 {showCop && (
-                                    <div style={{ flex: '40', minWidth: 0 }}>
+                                    <div style={{ flex: isTriple ? dynamicRatios[2] : (dynamicRatios[2] || 0.40), minWidth: 0 }}>
                                         <p
                                             style={{ ...chromaTextStyle, textAlign: 'center' }}
                                             dir="ltr"

@@ -708,25 +708,41 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
             );
 
             if (isDual) {
+                const ratioAr = dynamicRatios[0] ? `${Math.round(dynamicRatios[0] * 100)}` : '42';
+                const ratioCopAr = dynamicRatios[1] ? `${Math.round(dynamicRatios[1] * 100)}` : '58';
+
                 return (
                     <div
                         className={cn(
                             'flex w-full items-center',
-                            compact ? 'my-1' : 'my-1.5 mr-4',
-                            'gap-3 md:gap-4'
+                            compact ? 'my-1' : 'my-1.5',
+                            'gap-4'
                         )}
                     >
-                        <div className="hidden md:flex md:basis-[40%] items-center" />
+                        <div
+                            className="hidden md:flex items-center"
+                            style={{ flex: ratioAr }}
+                        >
+                            <div className="h-px flex-1 bg-gradient-to-l from-transparent to-muted-foreground/30" />
+                        </div>
 
-                        <div className="w-full md:w-px md:flex-none flex items-center justify-center overflow-visible">
+                        <div className="w-full md:w-px flex-shrink-0 flex items-center justify-center overflow-visible z-10">
                             <div className="h-px flex-1 bg-gradient-to-l from-transparent to-muted-foreground/30 md:hidden" />
-                            <span className={badgeClasses}>
-                                {currentSpeaker}
-                            </span>
+                            <div className="relative isolate group">
+                                <div className="absolute inset-0 bg-white dark:bg-[#020617] rounded-xl -z-10" />
+                                <span className={badgeClasses}>
+                                    {currentSpeaker}
+                                </span>
+                            </div>
                             <div className="h-px flex-1 bg-gradient-to-r from-transparent to-muted-foreground/30 md:hidden" />
                         </div>
 
-                        <div className="hidden md:flex md:basis-[60%] items-center" />
+                        <div
+                            className="hidden md:flex items-center"
+                            style={{ flex: ratioCopAr }}
+                        >
+                            <div className="h-px flex-1 bg-gradient-to-r from-transparent to-muted-foreground/30" />
+                        </div>
                     </div>
                 );
             }
@@ -734,9 +750,12 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
             return (
                 <div className={cn('flex w-full items-center', compact ? 'gap-2 my-1' : 'gap-2 my-1.5')}>
                     <div className="h-px flex-1 bg-gradient-to-l from-transparent to-muted-foreground/30" />
-                    <span className={badgeClasses}>
-                        {currentSpeaker}
-                    </span>
+                    <div className="relative isolate group">
+                        <div className="absolute inset-0 bg-white dark:bg-[#020617] rounded-xl -z-10" />
+                        <span className={badgeClasses}>
+                            {currentSpeaker}
+                        </span>
+                    </div>
                     <div className="h-px flex-1 bg-gradient-to-r from-transparent to-muted-foreground/30" />
                 </div>
             );
