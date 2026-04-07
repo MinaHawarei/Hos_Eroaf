@@ -49,6 +49,7 @@ export function useSync(mode: 'source' | 'receiver' = 'source') {
     const [state, setState] = useState<SyncState | null>(null);
     const channelRef = useRef<BroadcastChannel | null>(null);
     const [mirrorCount, setMirrorCount] = useState(0);
+    const lastPayloadRef = useRef<Omit<SyncState, 'timestamp'> | null>(null);
 
     useEffect(() => {
         const channel = new BroadcastChannel(CHANNEL_NAME);
@@ -69,6 +70,13 @@ export function useSync(mode: 'source' | 'receiver' = 'source') {
             channel.onmessage = (event) => {
                 if (event.data.type === 'MIRROR_READY') {
                     setMirrorCount(prev => prev + 1);
+                    // Re-send last known state so the new mirror doesn't stay on the waiting screen
+                    if (lastPayloadRef.current && channelRef.current) {
+                        channelRef.current.postMessage({
+                            type: 'SYNC_STATE',
+                            payload: { ...lastPayloadRef.current, timestamp: Date.now() }
+                        });
+                    }
                 } else if (event.data.type === 'MIRROR_CLOSED') {
                     setMirrorCount(prev => Math.max(0, prev - 1));
                 }
@@ -83,6 +91,7 @@ export function useSync(mode: 'source' | 'receiver' = 'source') {
     /** Broadcasts the current state to all connected mirrors/receivers */
     const broadcast = useCallback((payload: Omit<SyncState, 'timestamp'>) => {
         if (mode === 'source' && channelRef.current) {
+            lastPayloadRef.current = payload;
             channelRef.current.postMessage({ 
                 type: 'SYNC_STATE', 
                 payload: { ...payload, timestamp: Date.now() } 

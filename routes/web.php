@@ -32,6 +32,17 @@ Route::prefix('admin/content')->group(function () {
     Route::post('/update', [ContentManagerController::class, 'update'])->name('content.update');
 });
 
+/*
+Route::middleware(['auth', 'verified'])
+    ->prefix('admin/content')
+    ->group(function () {
+    Route::get('/', [ContentManagerController::class, 'index'])->name('content.index');
+    Route::get('/{category}/{filename}', [ContentManagerController::class, 'show'])->name('content.show');
+    Route::post('/store', [ContentManagerController::class, 'store'])->name('content.store');
+    Route::post('/update', [ContentManagerController::class, 'update'])->name('content.update');
+});
+*/
+
 // Settings
 Route::get('/settings', [SettingsController::class, 'index'])->name('settings');
 Route::post('/settings/church', [SettingsController::class, 'update'])->name('settings.update-church');

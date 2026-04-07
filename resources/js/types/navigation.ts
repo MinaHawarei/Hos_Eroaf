@@ -1,4 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
+import type { InertiaLinkProps } from '@inertiajs/react';
 
 export type BreadcrumbItem = {
     title: string;

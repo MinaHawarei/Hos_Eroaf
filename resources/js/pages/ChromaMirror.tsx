@@ -1,33 +1,75 @@
 import React, { useEffect, useState, useMemo, useRef, useLayoutEffect } from 'react';
 import { Head } from '@inertiajs/react';
 import { useSync } from '@/hooks/useSync';
-import { SplitViewReader } from '@/components/SplitViewReader';
-import AppLogoIcon from '@/components/AppLogoIcon';
-import {
-    linesHaveCopticScript,
-    resolveMultiColumnMode,
-} from '@/utils/presentationLayout';
+
+/**
+ * Text style constants for chroma keying.
+ * All text uses white with 1px black outline for maximum visibility.
+ */
+const CHROMA_TEXT_SHADOW = '-1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000';
+const CHROMA_GREEN = '#00b140';
+
+interface ChromaLine {
+    id: number;
+    lang_type: 'arabic' | 'coptic_arabized' | 'coptic';
+    text: string;
+    speaker?: string;
+}
+
+interface ChromaRow {
+    arabic: string;
+    copticArabized: string;
+    copticScript: string;
+    speaker?: string;
+}
+
+/**
+ * Groups flat lines into integrated rows by language type.
+ */
+function groupLinesIntoRows(lines: ChromaLine[]): ChromaRow[] {
+    const arabicLines: ChromaLine[] = [];
+    const arcopticLines: ChromaLine[] = [];
+    const copticLines: ChromaLine[] = [];
+
+    for (const line of lines) {
+        if (line.lang_type === 'arabic') arabicLines.push(line);
+        else if (line.lang_type === 'coptic_arabized') arcopticLines.push(line);
+        else if (line.lang_type === 'coptic') copticLines.push(line);
+    }
+
+    const maxRows = Math.max(arabicLines.length, arcopticLines.length, copticLines.length);
+    const rows: ChromaRow[] = [];
+
+    for (let i = 0; i < maxRows; i++) {
+        rows.push({
+            arabic: arabicLines[i]?.text || '',
+            copticArabized: arcopticLines[i]?.text || '',
+            copticScript: copticLines[i]?.text || '',
+            speaker: arabicLines[i]?.speaker || arcopticLines[i]?.speaker || copticLines[i]?.speaker,
+        });
+    }
+
+    return rows;
+}
 
 /**
  * ChromaMirror Component
  *
  * A specialized presentation mode designed for live broadcasting and chroma keying.
- * It provides a high-contrast environment (typically green) that can be removed
- * by broadcasting software (e.g., OBS, vMix) to overlay liturgical text on video.
+ * Provides a pure green (#00b140) background that can be removed by broadcasting
+ * software (e.g., OBS, vMix) to overlay liturgical text on video.
  *
- * Key Features:
- * - Fullscreen mode with hidden cursor.
- * - TV-safe margin enforcement (5% inset).
- * - Lower-third text positioning (constrained to bottom 45% of screen).
- * - Real-time synchronization with the master presentation via BroadcastChannel.
+ * Design:
+ * - Pure chroma green background with NO overlays or semi-transparent elements.
+ * - All text is white with 1px black outline for maximum contrast.
+ * - Text area is capped at 150px max height.
+ * - Renders rows directly (no SplitViewReader).
  */
 export default function ChromaMirror() {
     const { state } = useSync('receiver');
     const [interactivityEnabled, setInteractivityEnabled] = useState(true);
     const [showLogo, setShowLogo] = useState(true);
     const [logoExiting, setLogoExiting] = useState(false);
-    const containerRef = useRef<HTMLDivElement>(null);
-    const [containerHeight, setContainerHeight] = useState(400);
 
     /**
      * Initialization effect:
@@ -38,24 +80,16 @@ export default function ChromaMirror() {
     useEffect(() => {
         const enterFullscreen = () => {
             if (!document.fullscreenElement) {
-                // Requesting fullscreen on the document root
-                document.documentElement.requestFullscreen().catch(() => {
-                    // Browser might block auto-fullscreen without user interaction
-                });
+                document.documentElement.requestFullscreen().catch(() => {});
             }
-            // Disable interactivity (cursor, clicks) once in fullscreen
             setInteractivityEnabled(false);
         };
 
-        // Attempt immediate entry (might fail depending on browser policy)
         enterFullscreen();
-
-        // Fallback: Bind to a single click if auto-entry was blocked
         document.addEventListener('click', enterFullscreen, { once: true });
 
         const channel = new BroadcastChannel('presentation_sync');
         const handleBeforeUnload = () => {
-            // Notify the master window that this mirror instance is closing
             channel.postMessage({ type: 'MIRROR_CLOSED' });
         };
 
@@ -69,12 +103,11 @@ export default function ChromaMirror() {
     }, []);
 
     /**
-     * Logo lifecycle effect. Transistions the initial splash logo out
+     * Logo lifecycle effect. Transitions the initial splash logo out
      * once the first piece of presentation state is received.
      */
     useEffect(() => {
         if (state && state.currentSlide && showLogo) {
-            // Start the CSS exit animation
             setLogoExiting(true);
             const timer = setTimeout(() => {
                 setShowLogo(false);
@@ -84,42 +117,52 @@ export default function ChromaMirror() {
         }
     }, [state, showLogo]);
 
-    // Measure container height for dynamic layout
-    useLayoutEffect(() => {
-        const el = containerRef.current;
-        if (!el || typeof ResizeObserver === 'undefined') return;
-
-        const ro = new ResizeObserver((entries) => {
-            const h = entries[0]?.contentRect.height;
-            if (h && h > 0) {
-                setContainerHeight(Math.floor(h));
-            }
-        });
-        ro.observe(el);
-        setContainerHeight(Math.floor(el.getBoundingClientRect().height) || 400);
-        return () => ro.disconnect();
-    }, []);
-
     // Render the initial "Waiting/Splash" state with the app logo
     if (!state || !state.currentSlide) {
         return (
             <div
-                className="chroma-bg h-screen w-screen flex items-center justify-center overflow-hidden"
-                style={{ cursor: interactivityEnabled ? 'default' : 'none' }}
+                className="h-screen w-screen flex items-center justify-center overflow-hidden"
+                style={{
+                    backgroundColor: CHROMA_GREEN,
+                    cursor: interactivityEnabled ? 'default' : 'none',
+                }}
             >
                 <Head title="Chroma Mode — Broadcast" />
-                <div className="chroma-safe-area">
-                    <div className={`flex flex-col items-center gap-6 ${showLogo ? 'chroma-logo-enter' : ''}`}>
-                        <AppLogoIcon className="h-32 w-32 text-white drop-shadow-2xl" />
-                        <h1 className="text-white text-4xl font-bold font-serif tracking-wide drop-shadow-lg">
-                            هوس إيروف
-                        </h1>
-                        <p className="text-white/60 text-lg animate-pulse" dir="rtl">
-                            {interactivityEnabled
-                                ? 'Click anywhere to enable fullscreen...'
-                                : 'Waiting for presentation to start...'}
-                        </p>
-                    </div>
+                <div className="flex flex-col items-center gap-6">
+                    <img
+                        src="/icon.png"
+                        alt="هوس إيروف"
+                        style={{
+                            height: 160,
+                            width: 160,
+                            objectFit: 'contain',
+                            filter: 'drop-shadow(0 0 8px #000)',
+                        }}
+                        draggable={false}
+                    />
+                    <h1
+                        style={{
+                            color: '#fff',
+                            fontSize: 36,
+                            fontWeight: 700,
+                            textShadow: CHROMA_TEXT_SHADOW,
+                        }}
+                    >
+                        هوس إيروف
+                    </h1>
+                    <p
+                        style={{
+                            color: 'rgba(255,255,255,0.6)',
+                            fontSize: 18,
+                            textShadow: CHROMA_TEXT_SHADOW,
+                        }}
+                        className="animate-pulse"
+                        dir="rtl"
+                    >
+                        {interactivityEnabled
+                            ? 'Click anywhere to enable fullscreen...'
+                            : 'Waiting for presentation to start...'}
+                    </p>
                 </div>
             </div>
         );
@@ -127,29 +170,61 @@ export default function ChromaMirror() {
 
     const { currentSlide, activeAlternativeIndex, effectiveFontSize, readerPageIndex, slideId } = state;
 
-    // Resolve which lines to display
-    let displayLines = currentSlide.lines || [];
-    let displayHasCoptic = currentSlide.has_coptic || false;
+    // Resolve which lines to display — handle alternatives
+    let displayLines: ChromaLine[] = currentSlide.lines || [];
+    let displayIntonation: string | null = currentSlide.intonation || null;
+    let displayConclusion: string | null = currentSlide.conclusion || null;
 
     if (currentSlide.has_alternatives && currentSlide.alternatives) {
-        const alt = currentSlide.alternatives[activeAlternativeIndex];
+        const alt = currentSlide.alternatives[activeAlternativeIndex]
+            ?? currentSlide.alternatives[0];
         if (alt) {
             displayLines = alt.lines || [];
-            displayHasCoptic = alt.has_coptic || false;
+            displayIntonation = null;
+            displayConclusion = null;
         }
+    } else if (!displayLines.length) {
+        // slide has no lines at all — render nothing, keep green bg
     }
 
-    // Use all lines according to mode logic
-    const finalLines = displayLines;
+    // Group lines into integrated rows
+    const rows = groupLinesIntoRows(displayLines);
 
-    // Max height for text — bottom 40% of the safe area for lower-thirds
-    const textMaxHeight = Math.max(200, containerHeight * 0.45);
+    // Determine column count
+    const hasArabic = rows.some(r => r.arabic.trim().length > 0);
+    const hasCopticArabized = rows.some(r => r.copticArabized.trim().length > 0);
+    const hasCopticScript = rows.some(r => r.copticScript.trim().length > 0);
+    const columnCount = (hasArabic ? 1 : 0) + (hasCopticArabized ? 1 : 0) + (hasCopticScript ? 1 : 0);
+
+    // Extract speaker from first line (post-split, each slide should have one speaker)
+    const speaker = rows[0]?.speaker;
+
+    // Common text style for all chroma text
+    const chromaTextStyle: React.CSSProperties = {
+        color: '#ffffff',
+        textShadow: CHROMA_TEXT_SHADOW,
+        fontWeight: 'bold',
+        fontSize: `var(--pres-font-size, ${effectiveFontSize ?? 28}px)`,
+        lineHeight: 1.55,
+        textAlign: 'center',
+        wordBreak: 'break-word' as const,
+    };
+
+    // Divider style: white line with black outline
+    const dividerStyle: React.CSSProperties = {
+        width: 2,
+        alignSelf: 'stretch',
+        flexShrink: 0,
+        backgroundColor: '#fff',
+        boxShadow: '0 0 0 1px #000',
+    };
 
     return (
         <div
-            className="chroma-bg h-screen w-screen overflow-hidden select-none"
+            className="h-screen w-screen overflow-hidden select-none"
             dir="rtl"
             style={{
+                backgroundColor: CHROMA_GREEN,
                 cursor: interactivityEnabled ? 'default' : 'none',
                 '--pres-font-size': `${effectiveFontSize ?? 28}px`,
                 userSelect: 'none',
@@ -159,30 +234,196 @@ export default function ChromaMirror() {
 
             {/* Logo overlay — shows initially then fades out */}
             {showLogo && (
-                <div className={`fixed inset-0 z-50 flex items-center justify-center ${logoExiting ? 'chroma-logo-exit' : 'chroma-logo-enter'}`}>
+                <div
+                    className={`fixed inset-0 z-50 flex items-center justify-center ${logoExiting ? 'chroma-logo-exit' : 'chroma-logo-enter'}`}
+                    style={{ backgroundColor: CHROMA_GREEN }}
+                >
                     <div className="flex flex-col items-center gap-6">
-                        <AppLogoIcon className="h-32 w-32 text-white drop-shadow-2xl" />
-                        <h1 className="text-white text-4xl font-bold font-serif tracking-wide drop-shadow-lg">
+                        <img
+                            src="/icon.png"
+                            alt="هوس إيروف"
+                            style={{
+                                height: 128,
+                                width: 128,
+                                objectFit: 'contain',
+                                filter: 'drop-shadow(0 0 8px #000)',
+                            }}
+                            draggable={false}
+                        />
+                        <h1
+                            style={{
+                                color: '#fff',
+                                fontSize: 36,
+                                fontWeight: 700,
+                                textShadow: CHROMA_TEXT_SHADOW,
+                            }}
+                        >
                             هوس إيروف
                         </h1>
                     </div>
                 </div>
             )}
 
-            {/* TV-safe area with text at bottom */}
-            <div ref={containerRef} className="chroma-safe-area">
-                <div className="chroma-text-container">
-                    <SplitViewReader
-                        key={`chroma-${slideId}-${activeAlternativeIndex}`}
-                        initialPage={readerPageIndex ?? 0}
-                        lines={finalLines}
-                        hasCoptic={displayHasCoptic}
-                        justified={true}
-                        className="flex min-h-0 w-full min-w-0 flex-1 flex-col justify-center"
-                        fontSizePx={effectiveFontSize ?? 28}
-                        maxContentHeight={textMaxHeight}
-                        chromaMode={true}
-                    />
+            {/* Top-right logo — always visible */}
+            <div
+                style={{
+                    position: 'fixed',
+                    top: '4%',
+                    right: '4%',
+                    zIndex: 10,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                }}
+            >
+                <img
+                    src="/icon.png"
+                    alt="هوس إيروف"
+                    style={{
+                        height: 36,
+                        width: 36,
+                        objectFit: 'contain',
+                        filter: 'drop-shadow(0 0 3px #000)',
+                    }}
+                    draggable={false}
+                />
+                <span
+                    style={{
+                        color: '#fff',
+                        fontWeight: 700,
+                        fontSize: 16,
+                        textShadow: CHROMA_TEXT_SHADOW,
+                    }}
+                >
+                    هوس إيروف
+                </span>
+            </div>
+
+            {/* Main content area — positioned at the bottom of the screen */}
+            <div
+                style={{
+                    position: 'fixed',
+                    bottom: '5%',
+                    left: '5%',
+                    right: '5%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                }}
+            >
+                {/* Speaker name — if present */}
+                {speaker && (
+                    <>
+                        <div
+                            style={{
+                                ...chromaTextStyle,
+                                fontSize: `calc(var(--pres-font-size, ${effectiveFontSize ?? 28}px) * 0.6)`,
+                                marginBottom: 6,
+                            }}
+                        >
+                            {speaker}
+                        </div>
+                        {/* Thin white divider line */}
+                        <div
+                            style={{
+                                width: '100%',
+                                height: 1,
+                                backgroundColor: '#fff',
+                                boxShadow: '0 0 0 1px #000',
+                                marginBottom: 8,
+                            }}
+                        />
+                    </>
+                )}
+
+                {/* Rows container — max height 150px */}
+                <div
+                    style={{
+                        maxHeight: '150px',
+                        overflow: 'hidden',
+                        width: '100%',
+                    }}
+                >
+                    {rows.map((row, rowIdx) => {
+                        const showAr = row.arabic.trim().length > 0;
+                        const showArcop = row.copticArabized.trim().length > 0;
+                        const showCop = row.copticScript.trim().length > 0;
+
+                        if (!showAr && !showArcop && !showCop) return null;
+
+                        // Single column mode
+                        if (columnCount <= 1) {
+                            const text = showAr ? row.arabic : showArcop ? row.copticArabized : row.copticScript;
+                            const isCopticScript = !showAr && !showArcop && showCop;
+                            return (
+                                <p
+                                    key={`chroma-row-${rowIdx}`}
+                                    style={chromaTextStyle}
+                                    dir={isCopticScript ? 'ltr' : 'rtl'}
+                                    className={isCopticScript ? 'pres-coptic-text' : 'font-reading pres-arabic-text'}
+                                >
+                                    {text}
+                                </p>
+                            );
+                        }
+
+                        // Multi-column mode
+                        return (
+                            <div
+                                key={`chroma-row-${rowIdx}`}
+                                style={{
+                                    display: 'flex',
+                                    width: '100%',
+                                    alignItems: 'stretch',
+                                    gap: 12,
+                                }}
+                            >
+                                {showAr && (
+                                    <div style={{ flex: '42', minWidth: 0 }}>
+                                        <p
+                                            style={chromaTextStyle}
+                                            dir="rtl"
+                                            className="font-reading pres-arabic-text"
+                                        >
+                                            {row.arabic}
+                                        </p>
+                                    </div>
+                                )}
+
+                                {showAr && (showArcop || showCop) && (
+                                    <div style={dividerStyle} />
+                                )}
+
+                                {showArcop && (
+                                    <div style={{ flex: '58', minWidth: 0 }}>
+                                        <p
+                                            style={chromaTextStyle}
+                                            dir="rtl"
+                                            className="font-reading pres-arabic-text"
+                                        >
+                                            {row.copticArabized}
+                                        </p>
+                                    </div>
+                                )}
+
+                                {showCop && (showAr || showArcop) && (
+                                    <div style={dividerStyle} />
+                                )}
+
+                                {showCop && (
+                                    <div style={{ flex: '40', minWidth: 0 }}>
+                                        <p
+                                            style={{ ...chromaTextStyle, textAlign: 'center' }}
+                                            dir="ltr"
+                                            className="pres-coptic-text"
+                                        >
+                                            {row.copticScript}
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
                 </div>
             </div>
         </div>

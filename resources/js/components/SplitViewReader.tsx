@@ -833,18 +833,36 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
 
         // Multi-column mode (dual or triple)
         // Group currentLines into integrated rows for rendering
-        const currentIntegratedRows = useMemo(() => {
-            if (!currentLines.length) return [];
-            return groupIntoIntegratedRows(currentLines);
-        }, [currentLines]);
+        // NOTE: These useMemo hooks are AFTER the single-column return, but that's safe
+        // because columnMode is stable per-render — it never changes mid-render.
+        // However, to be 100% safe against React strict mode and future refactors,
+        // we keep them here since they are only used by multi-column rendering.
+        const currentIntegratedRows = groupIntoIntegratedRows(currentLines);
 
         const isTriple = columnMode === 'triple';
+
+        // Group rows by speaker for proper gap spacing:
+        // Gap only between distinct speaker groups, not between every row.
+        const speakerGroupsArr: { speaker: string | undefined; rows: IntegratedRow[] }[] = [];
+        {
+            let currentGrp: { speaker: string | undefined; rows: IntegratedRow[] } | null = null;
+            for (const row of currentIntegratedRows) {
+                const sp = row.speaker;
+                if (!currentGrp || currentGrp.speaker !== sp) {
+                    if (currentGrp) speakerGroupsArr.push(currentGrp);
+                    currentGrp = { speaker: sp, rows: [row] };
+                } else {
+                    currentGrp.rows.push(row);
+                }
+            }
+            if (currentGrp) speakerGroupsArr.push(currentGrp);
+        }
 
         return (
             <div
                 ref={measureRootRef}
                 className={cn(
-                    'flex h-full min-h-0 min-w-0 flex-1 flex-col items-stretch justify-center space-y-3 px-8 md:px-10',
+                    'flex h-full min-h-0 min-w-0 flex-1 flex-col items-stretch justify-center px-8 md:px-10',
                     className
                 )}
             >
@@ -859,123 +877,113 @@ export const SplitViewReader = forwardRef<SplitViewReaderRef, SplitViewReaderPro
                     </div>
                 )}
 
-                {currentIntegratedRows.map((row, index) => {
-                    const showAr = hasText(row.arabic);
-                    const showArcop = hasText(row.copticArabized);
-                    const showCop = isTriple && hasText(row.copticScript);
-
-                    const currentSpeaker = row.speaker;
-
-                    const previousRow = index > 0 ? currentIntegratedRows[index - 1] : null;
-                    const previousSpeaker = previousRow?.speaker;
-
-                    const shouldShowSpeaker = currentSpeaker && currentSpeaker !== previousSpeaker;
-
-                    if (!showAr && !showArcop && !showCop) {
-                        return null;
-                    }
-
-                    // Get dynamic width styles for each column
-                    const arStyle = getColumnWidthStyle(0);
-                    const arcopStyle = getColumnWidthStyle(1);
-                    const copStyle = isTriple ? getColumnWidthStyle(2) : {};
+                {speakerGroupsArr.map((group: { speaker: string | undefined; rows: IntegratedRow[] }, groupIdx: number) => {
+                    const groupSpeaker = group.speaker;
+                    const prevGroup = groupIdx > 0 ? speakerGroupsArr[groupIdx - 1] : null;
+                    const shouldShowSpeaker = groupSpeaker && groupSpeaker !== prevGroup?.speaker;
 
                     return (
                         <div
-                            key={`p${currentPage}-row-${row.id}-${index}`}
-                            className="flex flex-col space-y-2"
-                            style={{ animationDelay: `${index * 0.05}s` }}
+                            key={`p${currentPage}-grp-${groupIdx}`}
+                            className={cn('flex flex-col', groupIdx > 0 ? 'mt-3' : '')}
                         >
-                            {/* Speaker bar appears above the entire integrated row */}
-                            {shouldShowSpeaker && currentSpeaker && !chromaMode && renderSpeakerBar(currentSpeaker, false)}
+                            {/* Speaker bar appears once above the entire speaker group */}
+                            {shouldShowSpeaker && groupSpeaker && !chromaMode && renderSpeakerBar(groupSpeaker, false)}
 
-                            <div
-                                className={cn(
-                                    'flex w-full flex-col items-stretch md:flex-row md:items-stretch',
-                                    rowGapClass
-                                )}
-                            >
-                                {/* Arabic Column */}
-                                {showAr && (
-                                    <div
-                                        className="min-w-0 shrink-0 basis-full md:basis-auto"
-                                        style={arStyle}
-                                    >
-                                        <p
-                                            className={bodyParagraphClassNames(
-                                                justified,
-                                                chromaMode ? 'text-white' : 'text-foreground',
-                                                true,
-                                                false,
-                                                chromaMode
-                                            )}
-                                            dir="rtl"
-                                            dangerouslySetInnerHTML={lineHtml(row.arabic, highlightQuery)}
+                            {/* Column-based layout: columns hold all rows, dividers span full height */}
+                            <div className="flex w-full items-stretch gap-4">
+                                {/* Arabic column — all rows stacked */}
+                                <div
+                                    className="flex min-w-0 flex-col"
+                                    style={{ flex: dynamicRatios[0] ? `${Math.round(dynamicRatios[0] * 100)}` : '42' }}
+                                >
+                                    {group.rows.map((row: IntegratedRow, rowIdx: number) => {
+                                        if (!hasText(row.arabic)) {
+                                            return <div key={`ar-empty-${rowIdx}`} className="min-h-[1em]" />;
+                                        }
+                                        return (
+                                            <p
+                                                key={`ar-${row.id}-${rowIdx}`}
+                                                className={bodyParagraphClassNames(
+                                                    justified,
+                                                    chromaMode ? 'text-white' : 'text-foreground',
+                                                    true,
+                                                    false,
+                                                    chromaMode
+                                                )}
+                                                dir="rtl"
+                                                dangerouslySetInnerHTML={lineHtml(row.arabic, highlightQuery)}
+                                            />
+                                        );
+                                    })}
+                                </div>
+
+                                {/* Single continuous divider between Arabic and Coptic Arabized */}
+                                <div
+                                    className="w-px flex-shrink-0 self-stretch bg-black/20 dark:bg-white/20"
+                                    aria-hidden="true"
+                                />
+
+                                {/* Coptic Arabized column — all rows stacked */}
+                                <div
+                                    className="flex min-w-0 flex-col"
+                                    style={{ flex: dynamicRatios[1] ? `${Math.round(dynamicRatios[1] * 100)}` : '58' }}
+                                >
+                                    {group.rows.map((row: IntegratedRow, rowIdx: number) => {
+                                        if (!hasText(row.copticArabized)) {
+                                            return <div key={`arcop-empty-${rowIdx}`} className="min-h-[1em]" />;
+                                        }
+                                        return (
+                                            <p
+                                                key={`arcop-${row.id}-${rowIdx}`}
+                                                className={bodyParagraphClassNames(
+                                                    justified,
+                                                    chromaMode
+                                                        ? 'text-white/90'
+                                                        : '!text-[#880808] dark:!text-sky-400 break-words',
+                                                    true,
+                                                    false,
+                                                    chromaMode
+                                                )}
+                                                dir="rtl"
+                                                dangerouslySetInnerHTML={lineHtml(row.copticArabized, highlightQuery)}
+                                            />
+                                        );
+                                    })}
+                                </div>
+
+                                {/* Triple column: second divider + Coptic Script column */}
+                                {isTriple && (
+                                    <>
+                                        <div
+                                            className="w-px flex-shrink-0 self-stretch bg-black/20 dark:bg-white/20"
+                                            aria-hidden="true"
                                         />
-                                    </div>
-                                )}
-
-                                {/* Empty placeholder when Arabic is missing but others exist */}
-                                {!showAr && (showArcop || showCop) && (
-                                    <div className="min-w-0 shrink-0 basis-full md:basis-auto" style={arStyle} />
-                                )}
-
-                                {/* Vertical Divider between Arabic and Coptic Arabized */}
-                                {(showAr || !showAr) && (showArcop || showCop) && (
-                                    <div
-                                        className="hidden md:block w-px shrink-0 self-stretch min-h-0 bg-black/25 dark:bg-white/25"
-                                        aria-hidden="true"
-                                    />
-                                )}
-
-                                {/* Coptic Arabized Column */}
-                                {showArcop && (
-                                    <div
-                                        className="min-w-0 shrink-0 basis-full md:basis-auto"
-                                        style={arcopStyle}
-                                    >
-                                        <p
-                                            className={bodyParagraphClassNames(
-                                                justified,
-                                                chromaMode
-                                                    ? 'text-white/90'
-                                                    : '!text-[#880808] dark:!text-sky-400 break-words',
-                                                true,
-                                                false,
-                                                chromaMode
-                                            )}
-                                            dir="rtl"
-                                            dangerouslySetInnerHTML={lineHtml(row.copticArabized, highlightQuery)}
-                                        />
-                                    </div>
-                                )}
-
-                                {/* Vertical Divider between Coptic Arabized and Coptic Script (triple column only) */}
-                                {isTriple && (showArcop || showAr) && showCop && (
-                                    <div
-                                        className="hidden md:block w-px shrink-0 self-stretch min-h-0 bg-black/25 dark:bg-white/25"
-                                        aria-hidden="true"
-                                    />
-                                )}
-
-                                {/* Coptic Script Column (triple column only) */}
-                                {isTriple && showCop && row.copticScript && (
-                                    <div
-                                        className="min-w-0 shrink-0 basis-full break-words md:basis-auto"
-                                        style={copStyle}
-                                    >
-                                        <p
-                                            className={bodyParagraphClassNames(
-                                                justified,
-                                                chromaMode ? 'text-white/80' : 'text-foreground',
-                                                false,
-                                                true,
-                                                chromaMode
-                                            )}
-                                            dir="ltr"
-                                            dangerouslySetInnerHTML={lineHtml(row.copticScript, highlightQuery)}
-                                        />
-                                    </div>
+                                        <div
+                                            className="flex min-w-0 flex-col"
+                                            style={{ flex: dynamicRatios[2] ? `${Math.round(dynamicRatios[2] * 100)}` : '40' }}
+                                        >
+                                            {group.rows.map((row: IntegratedRow, rowIdx: number) => {
+                                                if (!hasText(row.copticScript)) {
+                                                    return <div key={`cop-empty-${rowIdx}`} className="min-h-[1em]" />;
+                                                }
+                                                return (
+                                                    <p
+                                                        key={`cop-${row.id}-${rowIdx}`}
+                                                        className={bodyParagraphClassNames(
+                                                            justified,
+                                                            chromaMode ? 'text-white/80' : 'text-foreground',
+                                                            false,
+                                                            true,
+                                                            chromaMode
+                                                        )}
+                                                        dir="ltr"
+                                                        dangerouslySetInnerHTML={lineHtml(row.copticScript!, highlightQuery)}
+                                                    />
+                                                );
+                                            })}
+                                        </div>
+                                    </>
                                 )}
                             </div>
                         </div>

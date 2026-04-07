@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useLayoutEffect, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useLayoutEffect, useRef, useMemo } from 'react';
 import { Head, router } from '@inertiajs/react';
 import { usePresentationNavigation } from '@/hooks/usePresentationNavigation';
 import { useSync } from '@/hooks/useSync';
@@ -82,12 +82,7 @@ const ZOOM_STEP = 0.1;
 const ZOOM_MIN = 0.5;
 const ZOOM_MAX = 2;
 
-// Static padding for the main container (pt-4 pb-5 = 16px + 20px = 36px)
-// plus an additional safety margin to prevent any accidental text clipping.
-const MAIN_PADDING_PX = 36 + 8;
-
-// Height of the bottom navigation bar (h-24 = 96px)
-const NAV_BAR_HEIGHT_PX = 96;
+// (Padding/nav constants removed — readerSlotRef already measures the content-only area)
 
 function readStoredZoom(): number {
     if (typeof window === 'undefined') {
@@ -99,6 +94,43 @@ function readStoredZoom(): number {
         return 1;
     }
     return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, n));
+}
+
+/**
+ * Splits a slide into multiple slides if it contains lines from more than one speaker.
+ * Used in chroma mode to ensure each resulting slide shows only one speaker group.
+ */
+function splitBySpeaker(slide: Slide): Slide[] {
+    if (!slide.lines || slide.lines.length === 0) return [slide];
+
+    const speakers = [...new Set(slide.lines.map((l: any) => l.speaker ?? '__none__'))];
+    if (speakers.length <= 1) return [slide]; // single speaker — no split needed
+
+    // Group lines by speaker, preserving order
+    const groups: { speaker: string | undefined; lines: any[] }[] = [];
+    let currentSpeaker: string | undefined = undefined;
+    let currentGroup: any[] = [];
+
+    for (const line of slide.lines) {
+        const sp = line.speaker;
+        if (sp !== currentSpeaker && currentGroup.length > 0) {
+            groups.push({ speaker: currentSpeaker, lines: currentGroup });
+            currentGroup = [];
+        }
+        currentSpeaker = sp;
+        currentGroup.push(line);
+    }
+    if (currentGroup.length > 0) {
+        groups.push({ speaker: currentSpeaker, lines: currentGroup });
+    }
+
+    return groups.map((g, i) => ({
+        ...slide,
+        id: `${slide.id}_sp${i}`,
+        lines: g.lines,
+        intonation: i === 0 ? slide.intonation : null,
+        conclusion: i === groups.length - 1 ? slide.conclusion : null,
+    }));
 }
 
 export default function PresentationPage({
@@ -136,10 +168,6 @@ export default function PresentationPage({
     const readerRef = React.useRef<SplitViewReaderRef>(null);
     const readerSlotRef = useRef<HTMLDivElement>(null);
 
-    // ref لقياس ارتفاع الـ header (section name + intonation + ornament)
-    const slideHeaderRef = useRef<HTMLDivElement>(null);
-    const [slideHeaderHeight, setSlideHeaderHeight] = useState(0);
-
     const mainRef = useRef<HTMLElement>(null);
     const [readerSlotHeight, setReaderSlotHeight] = useState(400);
     // Navigation and state synchronization metadata
@@ -155,39 +183,11 @@ export default function PresentationPage({
 
     /**
      * Calculate the actual available height for the SplitViewReader.
-     *
-     * readerSlotHeight is the total height of the main viewport.
-     * We subtract:
-     * 1. The actual measured height of the slide header.
-     * 2. The main container's vertical padding.
-     * 3. The fixed height of the navigation bar.
+     * readerSlotRef is attached to the content-only div (below header),
+     * so no deductions are needed.
      */
-    const effectiveReaderHeight = Math.max(
-        200,
-        readerSlotHeight - slideHeaderHeight - MAIN_PADDING_PX - NAV_BAR_HEIGHT_PX
-    );
+    const effectiveReaderHeight = Math.max(200, readerSlotHeight);
 
-    /**
-     * Measures the actual rendered height of the slide header (name + ornament).
-     * This measurement is crucial for calculating the remaining height for slide content.
-     */
-    useLayoutEffect(() => {
-        const el = slideHeaderRef.current;
-        if (!el) return;
-
-        const measure = () => {
-            const h = el.getBoundingClientRect().height;
-            if (h > 0) setSlideHeaderHeight(Math.ceil(h));
-        };
-
-        measure();
-
-        if (typeof ResizeObserver !== 'undefined') {
-            const ro = new ResizeObserver(measure);
-            ro.observe(el);
-            return () => ro.disconnect();
-        }
-    }, [deck, currentSlideIndex]);
 
     const processAndSplitSlides = useCallback(async () => {
         if (!slidesProp || slidesProp.length === 0) {
@@ -223,10 +223,16 @@ export default function PresentationPage({
                 splitFullRowSynchronizedWithRatios: (
                     ar: string, copAr: string, cop: string, triple: boolean, maxH: number, ratios: number[]
                 ) => paginator.splitFullRowSynchronizedWithRatios(ar, copAr, cop, triple, maxH, ratios),
+                splitOverflowRow: (a: string, b: string, c: string, t: boolean, m: number) =>
+                    paginator.splitOverflowRow(a, b, c, t, m),
             };
 
-            // Calculate segment height based on presentation mode
-            let availableHeight = Math.max(300, effectiveReaderHeight);
+            // Read height directly from DOM at call time — avoids stale state on first render
+            const slotEl = readerSlotRef.current;
+            const measuredHeight = slotEl
+                ? Math.floor(slotEl.getBoundingClientRect().height)
+                : Math.floor(window.innerHeight * 0.75);
+            let availableHeight = Math.max(300, measuredHeight);
             if (presentationMode === 'chroma') {
                 // Ensure text stays contained in the lower portion of the screen
                 const chromaConstraint = typeof window !== 'undefined'
@@ -242,6 +248,17 @@ export default function PresentationPage({
                 containerWidth,
                 measureAdapter
             );
+
+            // In chroma mode, apply a second pass: split slides by speaker
+            if (presentationMode === 'chroma') {
+                const chromaSplit: Slide[] = [];
+                for (const slide of result.slides) {
+                    const subSlides = splitBySpeaker(slide);
+                    chromaSplit.push(...subSlides);
+                }
+                result.slides = chromaSplit;
+                result.totalSplitSlides = chromaSplit.length;
+            }
 
             setDeck(result.slides);
             setSplitInfo(result);
@@ -260,11 +277,20 @@ export default function PresentationPage({
         } finally {
             setIsSplitting(false);
         }
-    }, [slidesProp, effectiveFontSize, effectiveReaderHeight, presentationMode]);
+    }, [slidesProp, effectiveFontSize, presentationMode]);
 
     useEffect(() => {
         processAndSplitSlides();
     }, [processAndSplitSlides]);
+
+    // One-time re-split after the first real ResizeObserver measurement
+    const hasInitialMeasure = useRef(false);
+    useEffect(() => {
+        if (readerSlotHeight > 200 && !hasInitialMeasure.current) {
+            hasInitialMeasure.current = true;
+            processAndSplitSlides();
+        }
+    }, [readerSlotHeight, processAndSplitSlides]);
 
     // Restore slide index after deck rebuild (fixes zoom reset bug)
     useEffect(() => {
@@ -362,7 +388,7 @@ export default function PresentationPage({
     const { broadcast, openMirrorWindow, openChromaWindow, closeMirrors, mirrorCount, hasMirrors } =
         useSync('source');
 
-    const currentSlide = deck?.[currentSlideIndex];
+    const currentSlide = useMemo(() => deck?.[currentSlideIndex], [deck, currentSlideIndex]);
 
     // Keep the ref in sync with current slide
     useEffect(() => {
@@ -411,6 +437,42 @@ export default function PresentationPage({
         return () => window.removeEventListener('keydown', h);
     }, [toggleFullscreen]);
 
+    /**
+     * Jumps to a specific liturgical section in the presentation deck.
+     * Used by the sidebar navigation.
+     */
+    const jumpToSection = useCallback((code: string) => {
+        const idx = deck.findIndex((s) => s.section_code === code);
+        if (idx !== -1) {
+            setCurrentSlideIndex(idx);
+            setSidebarOpen(false);
+        }
+    }, [deck]);
+
+    const handleLocalSearchResult = useCallback((slideId: string, q: string) => {
+        const idx = deck.findIndex((s) => s.id === slideId);
+        if (idx !== -1) {
+            setHighlightQuery(q);
+            setCurrentSlideIndex(idx);
+        }
+    }, [deck]);
+
+    const handleGlobalInsert = useCallback((slide: Record<string, unknown>, q: string) => {
+        const s = slide as unknown as Slide;
+        const inserted: Slide = {
+            ...s,
+            id: `${s.id}-ins-${Date.now()}`,
+        };
+        setDeck((d) => {
+            const next = [...d];
+            next.splice(currentSlideIndex + 1, 0, inserted);
+            return next;
+        });
+        setHighlightQuery(q);
+        setCurrentSlideIndex((i) => i + 1);
+    }, [currentSlideIndex]);
+
+    // ── Early return: Loading state ──
     if (isSplitting) {
         return (
             <div className="presentation-bg flex h-screen items-center justify-center p-8" dir="rtl">
@@ -424,6 +486,7 @@ export default function PresentationPage({
         );
     }
 
+    // ── Early return: Empty state ──
     if (!deck || deck.length === 0) {
         return (
             <div className="presentation-bg flex h-screen items-center justify-center p-8" dir="rtl">
@@ -440,40 +503,10 @@ export default function PresentationPage({
         );
     }
 
-    /**
-     * Jumps to a specific liturgical section in the presentation deck.
-     * Used by the sidebar navigation.
-     */
-    const jumpToSection = (code: string) => {
-        const idx = deck.findIndex((s) => s.section_code === code);
-        if (idx !== -1) {
-            setCurrentSlideIndex(idx);
-            setSidebarOpen(false);
-        }
-    };
-
-    const handleLocalSearchResult = (slideId: string, q: string) => {
-        const idx = deck.findIndex((s) => s.id === slideId);
-        if (idx !== -1) {
-            setHighlightQuery(q);
-            setCurrentSlideIndex(idx);
-        }
-    };
-
-    const handleGlobalInsert = (slide: Record<string, unknown>, q: string) => {
-        const s = slide as unknown as Slide;
-        const inserted: Slide = {
-            ...s,
-            id: `${s.id}-ins-${Date.now()}`,
-        };
-        setDeck((d) => {
-            const next = [...d];
-            next.splice(currentSlideIndex + 1, 0, inserted);
-            return next;
-        });
-        setHighlightQuery(q);
-        setCurrentSlideIndex((i) => i + 1);
-    };
+    // Guard: currentSlide may be undefined during deck transitions
+    if (!currentSlide) {
+        return null;
+    }
 
     return (
         <div
@@ -588,7 +621,7 @@ export default function PresentationPage({
 
             <main
                 ref={mainRef}
-                className="flex min-h-0 flex-1 flex-col items-stretch justify-start overflow-hidden px-8 pt-4 pb-5 md:px-10 md:pt-5 md:pb-5"
+                className="flex min-h-0 flex-1 flex-col items-stretch justify-start overflow-hidden px-10 pt-3 pb-3 md:px-16 md:pt-4 md:pb-4"
             >
                 <div className="pres-slide-column flex min-h-0 w-full max-w-none flex-1 flex-col justify-start">
 
@@ -597,7 +630,7 @@ export default function PresentationPage({
                      * هذا الـ div بيتقاس ارتفاعه بـ ResizeObserver
                      * وبيتخصم من effectiveReaderHeight قبل ما يتبعت للـ SplitViewReader
                      */}
-                    <div ref={slideHeaderRef} className="flex w-full flex-shrink-0 flex-col items-center">
+                    <div className="flex w-full flex-shrink-0 flex-col items-center">
                         <div className="slide-section-header pres-section-header-scale mb-3 text-center md:mb-4">
                             <span className="ornament" aria-hidden="true" />
                             <span>{currentSlide.section_name}</span>
@@ -615,6 +648,7 @@ export default function PresentationPage({
                      */}
                     <div
                         ref={readerSlotRef}
+                        style={{ transition: 'opacity 0.15s ease' }}
                         className="flex min-h-0 w-full flex-1 flex-col justify-center overflow-hidden"
                     >
                         {currentSlide.has_alternatives && currentSlide.alternatives ? (() => {
