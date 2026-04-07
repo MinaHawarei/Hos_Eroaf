@@ -10,11 +10,11 @@ import {
 
 /**
  * ChromaMirror Component
- * 
+ *
  * A specialized presentation mode designed for live broadcasting and chroma keying.
- * It provides a high-contrast environment (typically green) that can be removed 
+ * It provides a high-contrast environment (typically green) that can be removed
  * by broadcasting software (e.g., OBS, vMix) to overlay liturgical text on video.
- * 
+ *
  * Key Features:
  * - Fullscreen mode with hidden cursor.
  * - TV-safe margin enforcement (5% inset).
@@ -69,7 +69,7 @@ export default function ChromaMirror() {
     }, []);
 
     /**
-     * Logo lifecycle effect. Transistions the initial splash logo out 
+     * Logo lifecycle effect. Transistions the initial splash logo out
      * once the first piece of presentation state is received.
      */
     useEffect(() => {
@@ -112,7 +112,7 @@ export default function ChromaMirror() {
                     <div className={`flex flex-col items-center gap-6 ${showLogo ? 'chroma-logo-enter' : ''}`}>
                         <AppLogoIcon className="h-32 w-32 text-white drop-shadow-2xl" />
                         <h1 className="text-white text-4xl font-bold font-serif tracking-wide drop-shadow-lg">
-                            Hos Eroaf
+                            هوس إيروف
                         </h1>
                         <p className="text-white/60 text-lg animate-pulse" dir="rtl">
                             {interactivityEnabled
@@ -163,7 +163,7 @@ export default function ChromaMirror() {
                     <div className="flex flex-col items-center gap-6">
                         <AppLogoIcon className="h-32 w-32 text-white drop-shadow-2xl" />
                         <h1 className="text-white text-4xl font-bold font-serif tracking-wide drop-shadow-lg">
-                            Hos Eroaf
+                            هوس إيروف
                         </h1>
                     </div>
                 </div>

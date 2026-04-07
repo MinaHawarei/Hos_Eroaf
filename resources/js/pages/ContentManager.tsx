@@ -103,7 +103,7 @@ function LiturgyForm({ content, onChange }: { content: any; onChange: (c: any) =
         onChange({ ...content, content: next });
     };
 
-    /** Adds a new empty segment/block to the content list */
+    /** Adds a new empty قطعة/block to the content list */
     const addBlock = () => {
         onChange({ ...content, content: [...blocks, { speaker: '', text_ar: [], text_ar_co: [], text_co: [] }] });
     };
@@ -120,7 +120,7 @@ function LiturgyForm({ content, onChange }: { content: any; onChange: (c: any) =
             {/* Top-level metadata fields (Title, Internal Code, Visual Style) */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-5 bg-muted/30 rounded-2xl border border-border/10">
                 <div>
-                    <label className="label-xs">Title (Arabic)</label>
+                    <label className="label-xs">Tit+le (Arabic)</label>
                     <input className="field-input !bg-white text-black" dir="rtl" value={content.title || ''} onChange={e => setTop('title', e.target.value)} />
                 </div>
                 <div>
@@ -147,7 +147,7 @@ function LiturgyForm({ content, onChange }: { content: any; onChange: (c: any) =
 
                         <div className="flex items-center gap-2 mb-4">
                             <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
-                                Segment #{idx + 1}
+                                قطعة #{idx + 1}
                             </span>
                             <select
                                 className="field-input !bg-white text-black flex-1"
@@ -155,37 +155,37 @@ function LiturgyForm({ content, onChange }: { content: any; onChange: (c: any) =
                                 value={block.speaker || ''}
                                 onChange={e => setBlock(idx, 'speaker', e.target.value)}
                             >
-                                <option value="">— Select Speaker —</option>
-                                <option value="الشعب">People</option>
-                                <option value="الكاهن">Priest</option>
-                                <option value="الشماس">Deacon</option>
+                                <option value="">— اختيار المتكلم —</option>
+                                <option value="الشعب">الشعب</option>
+                                <option value="الكاهن">الكاهن</option>
+                                <option value="الشماس">الشماس</option>
                             </select>
                         </div>
 
                         {/* Multi-script text area for the liturgical block */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4" dir="rtl">
                             <div>
-                                <label className="label-xs">Arabic Text</label>
+                                <label className="label-xs">النص عربي</label>
                                 <textarea
                                     className="field-textarea h-36 !bg-white text-black"
                                     dir="rtl"
                                     value={arrToText(block.text_ar)}
                                     onChange={e => setBlock(idx, 'text_ar', textToArr(e.target.value))}
-                                    placeholder="One line per segment..."
+                                    placeholder="One line per قطعة..."
                                 />
                             </div>
                             <div>
-                                <label className="label-xs">Coptic (Arabized)</label>
+                                <label className="label-xs">قبطي معرب</label>
                                 <textarea
                                     className="field-textarea h-36 !bg-white text-black"
                                     dir="rtl"
                                     value={arrToText(block.text_ar_co)}
                                     onChange={e => setBlock(idx, 'text_ar_co', textToArr(e.target.value))}
-                                    placeholder="One line per segment..."
+                                    placeholder="One line per قطعة..."
                                 />
                             </div>
                             <div>
-                                <label className="label-xs">Coptic Script</label>
+                                <label className="label-xs">قبطي</label>
                                 <textarea
                                     className="field-textarea h-36 !bg-white text-black"
                                     value={arrToText(block.text_co)}
@@ -204,7 +204,7 @@ function LiturgyForm({ content, onChange }: { content: any; onChange: (c: any) =
                 className="w-full py-5 border-2 border-dashed border-border/30 rounded-2xl text-sm text-muted-foreground hover:border-primary/40 hover:text-primary hover:bg-primary/5 transition-all flex items-center justify-center gap-2"
             >
                 <Plus className="h-4 w-4" />
-                Add New Segment
+                اضافة قطعة جديدة
             </button>
         </div>
     );
@@ -562,10 +562,10 @@ function DeleteModal({ category, filename, onClose }: { category: string; filena
 
 /**
  * ContentManager Page Component
- * 
- * The primary administrative interface for managing the application's liturgical 
+ *
+ * The primary administrative interface for managing the application's liturgical
  * and reading JSON content files.
- * 
+ *
  * Features:
  * - Sidebar file explorer with search and category filtering.
  * - Dynamic form generation based on the selected file's category.

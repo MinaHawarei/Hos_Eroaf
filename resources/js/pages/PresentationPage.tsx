@@ -155,7 +155,7 @@ export default function PresentationPage({
 
     /**
      * Calculate the actual available height for the SplitViewReader.
-     * 
+     *
      * readerSlotHeight is the total height of the main viewport.
      * We subtract:
      * 1. The actual measured height of the slide header.
@@ -230,8 +230,8 @@ export default function PresentationPage({
             if (presentationMode === 'chroma') {
                 // Ensure text stays contained in the lower portion of the screen
                 const chromaConstraint = typeof window !== 'undefined'
-                    ? Math.max(250, window.innerHeight * 0.40)
-                    : 350;
+                    ? Math.max(150, window.innerHeight * 0.40)
+                    : 150;
                 availableHeight = Math.min(availableHeight, chromaConstraint);
             }
 

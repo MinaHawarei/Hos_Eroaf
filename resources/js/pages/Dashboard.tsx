@@ -91,8 +91,8 @@ const seasonStyles: Record<string, { icon: any; gradient: string; badge: string 
 
 /**
  * Dashboard Component
- * 
- * The main landing page for users. Displays the current Coptic calendar date, 
+ *
+ * The main landing page for users. Displays the current Coptic calendar date,
  * seasonal context, and provides navigation to the lectionary, liturgy, and other modules.
  */
 export default function Dashboard({
@@ -105,7 +105,7 @@ export default function Dashboard({
     dayName
 }: Props) {
     const { setDateContext } = useDayContext();
-    
+
     /** Selects the appropriate visual theme based on the current season */
     const currentSeasonStyle = useMemo(() => {
         return seasonStyles[season] || seasonStyles.annual;
@@ -138,7 +138,7 @@ export default function Dashboard({
                             </div>
 
                             <h1 className="text-2xl font-bold text-foreground sm:text-3xl">
-                                Today&apos;s Readings
+                                قراءات اليوم - {dayName}
                             </h1>
 
                             <div className="flex flex-col gap-1.5">
@@ -171,7 +171,7 @@ export default function Dashboard({
                                     className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:opacity-90 hover:shadow-md active:scale-[0.98]"
                                 >
                                     <BookOpen className="h-4 w-4" />
-                                    Read Online
+                                    عرض اونلاين
                                 </Link>
 
                                 <Link
@@ -179,7 +179,7 @@ export default function Dashboard({
                                     className="inline-flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400 px-4 py-2.5 text-sm font-semibold shadow-sm transition-all hover:bg-amber-500/20 active:scale-[0.98]"
                                 >
                                     <Sparkles className="h-4 w-4" />
-                                    Church Presentation
+                                    عرض القداس
                                 </Link>
 
                                 <Link
@@ -187,7 +187,7 @@ export default function Dashboard({
                                     className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground shadow-sm transition-all hover:bg-muted active:scale-[0.98]"
                                 >
                                     <Mic className="h-4 w-4" />
-                                    Audio Mode
+                                    استماع للقداس
                                 </Link>
                             </>
 
@@ -225,7 +225,7 @@ export default function Dashboard({
                                     className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400 px-2 py-2 text-sm font-bold shadow-sm transition-all hover:bg-amber-500/20 active:scale-[0.96]"
                                 >
                                     <Monitor className="h-4 w-4" />
-                                    <span>View</span>
+                                    <span>عرض</span>
                                 </Link>
 
                                 <Link
@@ -233,7 +233,7 @@ export default function Dashboard({
                                     className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1 rounded-xl border border-border bg-background px-2 py-2 text-sm font-medium text-foreground shadow-sm transition-all hover:bg-muted active:scale-[0.96]"
                                 >
                                     <Mic className="h-4 w-4" />
-                                    <span>Audio</span>
+                                    <span>استماع</span>
                                 </Link>
                             </div>
                         </div>
@@ -263,7 +263,7 @@ export default function Dashboard({
                                     className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400 px-2 py-2 text-sm font-bold shadow-sm transition-all hover:bg-amber-500/20 active:scale-[0.96]"
                                 >
                                     <Monitor className="h-4 w-4" />
-                                    <span>View</span>
+                                    <span>عرض</span>
                                 </Link>
 
                                 <Link
@@ -271,7 +271,7 @@ export default function Dashboard({
                                     className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1 rounded-xl border border-border bg-background px-2 py-2 text-sm font-medium text-foreground shadow-sm transition-all hover:bg-muted active:scale-[0.96]"
                                 >
                                     <Mic className="h-4 w-4" />
-                                    <span>Audio</span>
+                                    <span>استماع</span>
                                 </Link>
                             </div>
                         </div>
