@@ -94,6 +94,7 @@ class PresentationController extends Controller
 
                 $slides[] = [
                     'id' => "slide-{$section['code']}-{$reading['id']}",
+                    'day_key' => $dayKey,
                     'section_code' => $section['code'],
                     'section_name' => $section['name_ar'],
                     'title' => $reading['title_ar'],
@@ -289,6 +290,7 @@ class PresentationController extends Controller
 
             $slides[] = [
                 'id' => "slide-{$section['code']}",
+                'day_key' => $dayKey,
                 'section_code' => $section['code'],
                 'section_name' => $section['name_ar'],
                 'title' => $reading['title_ar'],

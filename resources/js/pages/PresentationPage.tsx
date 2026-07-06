@@ -58,6 +58,8 @@ interface Slide {
     active_index?: number;
     /** List of alternative content items */
     alternatives?: SlideAlternativeItem[];
+    /** Day key for the slide (used for navigation) */
+    day_key?: string;
 }
 
 /**
@@ -150,6 +152,9 @@ export default function PresentationPage({
     const [splitInfo, setSplitInfo] = useState<SplitResult | null>(null);
     const [altPreferences, setAltPreferences] = useState<Record<string, number>>({});
 
+    // ✅ State for tracking updated sections
+    const [currentSections, setCurrentSections] = useState<LiturgySection[]>(sections);
+
     const [baseFontSize] = useState(() => {
         const fromCookie = Number(Cookies.get('baseFontSize'));
         if (Number.isFinite(fromCookie) && fromCookie > 0) {
@@ -189,6 +194,87 @@ export default function PresentationPage({
      */
     const effectiveReaderHeight = Math.max(200, readerSlotHeight);
 
+    // ✅ Sync currentSections with sections prop when it changes
+    useEffect(() => {
+        setCurrentSections(sections);
+    }, [sections]);
+
+    /**
+     * ✅ Update sections when a new slide is inserted
+     */
+    const updateSectionsWithNewSlide = useCallback((newSlide: Slide, newDeck: Slide[]) => {
+        const sectionCode = newSlide.section_code;
+
+        // Find the section in current sections
+        const sectionIndex = currentSections.findIndex(s => s.code === sectionCode);
+
+        if (sectionIndex === -1) {
+            // Section doesn't exist, create a new one
+            const newSection: LiturgySection = {
+                id: sectionCode,
+                code: sectionCode,
+                name_ar: newSlide.section_name || sectionCode,
+                has_alternatives: false,
+                readings: [{
+                    id: 1,
+                    title_ar: newSlide.title || newSlide.section_name || '',
+                    intonation: newSlide.intonation || null,
+                    conclusion: newSlide.conclusion || null,
+                    has_coptic: newSlide.has_coptic || false,
+                    lines: newSlide.lines || [],
+                    style: 1,
+                }]
+            };
+
+            setCurrentSections(prev => [...prev, newSection]);
+            return;
+        }
+
+        // Add the slide to the existing section
+        setCurrentSections(prev => {
+            const updated = [...prev];
+            const section = updated[sectionIndex];
+
+            // If section has alternatives, convert to regular readings
+            if (section.has_alternatives) {
+                const firstAlt = section.alternatives?.[0];
+                const newReading = {
+                    id: (section.readings?.length || 0) + 1,
+                    title_ar: newSlide.title || newSlide.section_name || '',
+                    intonation: newSlide.intonation || null,
+                    conclusion: newSlide.conclusion || null,
+                    has_coptic: newSlide.has_coptic || false,
+                    lines: newSlide.lines || [],
+                    style: 1,
+                };
+
+                updated[sectionIndex] = {
+                    ...section,
+                    has_alternatives: false,
+                    readings: [...(section.readings || []), newReading],
+                    alternatives: undefined,
+                };
+            } else {
+                // Add regular reading
+                const newReading = {
+                    id: (section.readings?.length || 0) + 1,
+                    title_ar: newSlide.title || newSlide.section_name || '',
+                    intonation: newSlide.intonation || null,
+                    conclusion: newSlide.conclusion || null,
+                    has_coptic: newSlide.has_coptic || false,
+                    lines: newSlide.lines || [],
+                    style: 1,
+                };
+
+                updated[sectionIndex] = {
+                    ...section,
+                    readings: [...(section.readings || []), newReading],
+                };
+            }
+
+            return updated;
+        });
+    }, [currentSections]);
 
     const processAndSplitSlides = useCallback(async () => {
         if (!slidesProp || slidesProp.length === 0) {
@@ -461,6 +547,10 @@ export default function PresentationPage({
         }
     }, [deck]);
 
+    /**
+     * ✅ Handle global insert from search overlay
+     * Inserts a new slide after the current slide and updates sections
+     */
     const handleGlobalInsert = useCallback((slide: Record<string, unknown>, q: string) => {
         const s = slide as unknown as Slide;
         const inserted: Slide = {
@@ -472,12 +562,18 @@ export default function PresentationPage({
 
         setDeck((d) => {
             const next = [...d];
-            next.splice(currentSlideIndex + 1, 0, inserted);
+            const insertIndex = currentSlideIndex + 1;
+            next.splice(insertIndex, 0, inserted);
+
+            // ✅ Update sections after adding the slide
+            updateSectionsWithNewSlide(inserted, next);
+
             return next;
         });
+
         setHighlightQuery(q);
         setCurrentSlideIndex((i) => i + 1);
-    }, [currentSlideIndex]);
+    }, [currentSlideIndex, updateSectionsWithNewSlide]);
 
     // ── Early return: Loading state ──
     if (isSplitting) {
@@ -645,7 +741,7 @@ export default function PresentationPage({
             <PresentationSidebar
                 isOpen={sidebarOpen}
                 setIsOpen={setSidebarOpen}
-                sections={sections}
+                sections={currentSections}
                 currentSlideCode={currentSlide.section_code}
                 onJumpToSection={jumpToSection}
             />
