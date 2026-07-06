@@ -11,10 +11,12 @@ import {
     Sparkles,
     Sun,
 } from 'lucide-react';
-import { useMemo, useEffect } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 import { DateSelector } from '@/components/DateSelector';
 import { router } from '@inertiajs/react';
 import { useDayContext } from '@/contexts/DayContext';
+import { SearchOverlay } from '@/components/SearchOverlay';
+
 
 // Types from the controller
 /**
@@ -110,10 +112,27 @@ export default function Dashboard({
     const currentSeasonStyle = useMemo(() => {
         return seasonStyles[season] || seasonStyles.annual;
     }, [season]);
+    const [searchOpen, setSearchOpen] = useState(false);
+
 
     useEffect(() => {
 
     }, [dayKey, copticDate.formatted, seasonLabel, setDateContext]);
+
+     useEffect(() => {
+            const h = (e: KeyboardEvent) => {
+                if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+                    e.preventDefault();
+                    setSearchOpen(true);
+                }
+                if (e.key === 'f' && (e.target as HTMLElement).tagName !== 'INPUT') {
+                    e.preventDefault();
+                }
+            };
+            window.addEventListener('keydown', h);
+            return () => window.removeEventListener('keydown', h);
+        },);
+
 
     return (
         <HosLayout title="قراءات اليوم">
@@ -175,7 +194,7 @@ export default function Dashboard({
                                 </Link>
 
                                 <Link
-                                    href={`/presentation/lectionary/${dayKey}`}
+                                    href={`/presentation/lectionary/${dayKey}?season=${season}`}
                                     className="inline-flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400 px-4 py-2.5 text-sm font-semibold shadow-sm transition-all hover:bg-amber-500/20 active:scale-[0.98]"
                                 >
                                     <Sparkles className="h-4 w-4" />
@@ -221,7 +240,7 @@ export default function Dashboard({
                             {/* الجزء الأيسر: أزرار الأكشن */}
                              <div className="flex items-center gap-1 w-full sm:w-auto shrink-0 border-t sm:border-t-0 pt-3 sm:pt-0">
                                 <Link
-                                    href={`/presentation/lectionary/${dayKey}`}
+                                    href={`/presentation/lectionary/${dayKey}?season=${season}`}
                                     className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400 px-2 py-2 text-sm font-bold shadow-sm transition-all hover:bg-amber-500/20 active:scale-[0.96]"
                                 >
                                     <Monitor className="h-4 w-4" />
@@ -233,8 +252,15 @@ export default function Dashboard({
                                     className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1 rounded-xl border border-border bg-background px-2 py-2 text-sm font-medium text-foreground shadow-sm transition-all hover:bg-muted active:scale-[0.96]"
                                 >
                                     <Mic className="h-4 w-4" />
-                                    <span>استماع</span>
+                                    <span>بحث</span>
                                 </Link>
+                                <SearchOverlay
+                                    open={searchOpen}
+                                    onOpenChange={setSearchOpen}
+                                    onLocalResult={handleLocalSearchResult}
+                                    onGlobalInsert={handleGlobalInsert}
+                                    slides={deck}
+                                />
                             </div>
                         </div>
                         <div className="group flex flex-col sm:flex-row items-start sm:items-center gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm transition-all hover:shadow-md">

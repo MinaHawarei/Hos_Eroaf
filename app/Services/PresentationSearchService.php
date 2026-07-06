@@ -42,6 +42,19 @@ class PresentationSearchService
             }
         }
 
+        $synaxariumPath = $lectionaryPath.DIRECTORY_SEPARATOR.'synaxarium';
+        if (is_dir($synaxariumPath)) {
+            foreach (File::files($synaxariumPath) as $fileInfo) {
+                if (strtolower($fileInfo->getExtension()) !== 'json') {
+                    continue;
+                }
+                $this->searchSynaxariumFile($fileInfo->getPathname(), $fileInfo->getFilename(), $normalizedQuery, $results, $limit);
+                if (count($results) >= $limit) {
+                    return $results;
+                }
+            }
+        }
+
         $liturgyPath = $base.DIRECTORY_SEPARATOR.self::LiturgyDir;
         if (is_dir($liturgyPath)) {
             foreach (File::files($liturgyPath) as $fileInfo) {
@@ -157,6 +170,48 @@ class PresentationSearchService
         }
 
         return $out;
+    }
+
+    private function searchSynaxariumFile(string $path, string $filename, string $normalizedQuery, array &$results, int $limit): void
+    {
+        $raw = file_get_contents($path);
+        if ($raw === false) return;
+
+        $data = json_decode($raw, true);
+        if (! is_array($data) || ! isset($data['content'])) return;
+
+        $textContent = $data['content'];
+        $textAr = array_values(array_filter(array_map('trim', explode("\n", $textContent))));
+
+        $dayLabel = $data['coptic_date'] ?? $filename;
+        $title = 'السنكسار';
+
+        $lines = [];
+        foreach ($textAr as $text) {
+            $lines[] = ['text' => $text, 'class' => ''];
+        }
+
+        if (! $this->linesMatch($lines, $normalizedQuery)) {
+            return;
+        }
+
+        $slide = [
+            'id' => 'global-synaxarium-'.pathinfo($filename, PATHINFO_FILENAME),
+            'section_code' => 'synaxarium',
+            'section_name' => $title,
+            'title' => $title,
+            'intonation' => 'اليوم ' . $dayLabel,
+            'conclusion' => null,
+            'lines' => $lines,
+            'has_coptic' => false,
+        ];
+
+        $results[] = [
+            'source' => 'lectionary',
+            'file' => $filename,
+            'label' => 'السنكسار — '.$dayLabel,
+            'slide' => $slide,
+        ];
     }
 
     /**

@@ -7,14 +7,17 @@ use App\Services\PresentationSearchService;
 use App\Support\ReadingLineAssembler;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 
 class PresentationController extends Controller
 {
     public function lectionary(Request $request, string $dayKey, ContentService $content)
     {
+        $dayData = null;
         try {
-            $dayData = $content->getLectionary($dayKey);
+            $season = $request->query('season');
+            $dayData = $content->getLectionary($dayKey, $season);
         } catch (\Exception $e) {
             // return redirect()->route('home');
         }
@@ -131,7 +134,7 @@ class PresentationController extends Controller
         $dayKey = (int) $request->input('dayKey.dayKey');
         $dayName = $request->input('dayName.dayName');
         $season = $request->input('season.season');
-
+        Log::info('$dayName: ' . $dayName);
         $churchSettingsRaw = $request->cookie('church_settings');
         $churchSettings = [];
         if ($churchSettingsRaw) {
