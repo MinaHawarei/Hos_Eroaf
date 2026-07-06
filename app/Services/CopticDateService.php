@@ -27,6 +27,43 @@ class CopticDateService
     ];
 
     /**
+     * Arabic number words for days (1-31)
+     */
+    private const DAY_NUMBERS_AR = [
+        1 => 'الأول',
+        2 => 'الثاني',
+        3 => 'الثالث',
+        4 => 'الرابع',
+        5 => 'الخامس',
+        6 => 'السادس',
+        7 => 'السابع',
+        8 => 'الثامن',
+        9 => 'التاسع',
+        10 => 'العاشر',
+        11 => 'الحادي عشر',
+        12 => 'الثاني عشر',
+        13 => 'الثالث عشر',
+        14 => 'الرابع عشر',
+        15 => 'الخامس عشر',
+        16 => 'السادس عشر',
+        17 => 'السابع عشر',
+        18 => 'الثامن عشر',
+        19 => 'التاسع عشر',
+        20 => 'العشرون',
+        21 => 'الحادي والعشرون',
+        22 => 'الثاني والعشرون',
+        23 => 'الثالث والعشرون',
+        24 => 'الرابع والعشرون',
+        25 => 'الخامس والعشرون',
+        26 => 'السادس والعشرون',
+        27 => 'السابع والعشرون',
+        28 => 'الثامن والعشرون',
+        29 => 'التاسع والعشرون',
+        30 => 'الثلاثون',
+        31 => 'الحادي والثلاثون',
+    ];
+
+    /**
      * Coptic month names in English (for reference)
      */
     private const MONTHS_EN = [
@@ -49,7 +86,7 @@ class CopticDateService
      * Convert a Coptic date string or components to a formatted Arabic date
      *
      * @param string|array $date Either a date string like "1/2" or array with 'day' and 'month'
-     * @param string $format Format: 'full' (day month year) or 'day_month' (day month)
+     * @param string $format Format: 'full' (day month year) or 'day_month' (day month) or 'verbal' (اليوم الثلاثون من شهر بؤونة)
      * @return string Formatted Coptic date in Arabic
      */
     public function format($date, string $format = 'day_month'): string
@@ -65,11 +102,39 @@ class CopticDateService
 
         $monthName = $this->getMonthName($month);
 
+        if ($format === 'verbal') {
+            return $this->formatVerbal($day, $monthName);
+        }
+
         if ($format === 'full' && $year !== null) {
             return "{$day} {$monthName} {$year}";
         }
 
         return "{$day} {$monthName}";
+    }
+
+    /**
+     * Format date in verbal form: "اليوم الثلاثون من شهر بؤونة"
+     *
+     * @param int $day Day number
+     * @param string $monthName Month name in Arabic
+     * @return string Verbal date format
+     */
+    public function formatVerbal(int $day, string $monthName): string
+    {
+        $dayWord = $this->getDayWord($day);
+        return "اليوم {$dayWord} من شهر {$monthName}";
+    }
+
+    /**
+     * Get the Arabic word for a day number
+     *
+     * @param int $day Day number (1-31)
+     * @return string Day number in Arabic words
+     */
+    public function getDayWord(int $day): string
+    {
+        return self::DAY_NUMBERS_AR[$day] ?? (string) $day;
     }
 
     /**
@@ -80,7 +145,7 @@ class CopticDateService
      */
     public function getMonthName(int $month): string
     {
-        return self::MONTHS_AR[$month] ?? $month;
+        return self::MONTHS_AR[$month] ?? (string) $month;
     }
 
     /**
@@ -91,7 +156,7 @@ class CopticDateService
      */
     public function getMonthNameEn(int $month): string
     {
-        return self::MONTHS_EN[$month] ?? $month;
+        return self::MONTHS_EN[$month] ?? (string) $month;
     }
 
     /**
@@ -161,9 +226,10 @@ class CopticDateService
      * Format a Coptic date label for search results
      *
      * @param string|array $date The date to format
+     * @param string $format Format: 'short' (30 بؤونة) or 'verbal' (اليوم الثلاثون من شهر بؤونة)
      * @return string Formatted date label
      */
-    public function formatSearchLabel($date): string
+    public function formatSearchLabel($date, string $format = 'verbal'): string
     {
         $parts = $this->parseDate($date);
         if ($parts === null) {
@@ -173,6 +239,12 @@ class CopticDateService
         $day = $parts['day'];
         $month = $this->getMonthName($parts['month']);
 
-        return "{$day} {$month}";
+        if ($format === 'short') {
+            return "{$day} {$month}";
+        }
+
+        // Verbal format: "اليوم الثلاثون من شهر بؤونة"
+        $dayWord = $this->getDayWord($day);
+        return "اليوم {$dayWord} من شهر {$month}";
     }
 }

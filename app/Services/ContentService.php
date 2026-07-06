@@ -77,11 +77,14 @@ class ContentService
                 if ($synaxariumData) {
                     $textContent = $synaxariumData['content'] ?? '';
                     $textAr = array_values(array_filter(array_map('trim', explode("\n", $textContent))));
+                    $copticDateService = app(CopticDateService::class);
+                    $copticDate = $synaxariumData['coptic_date'] ?? '';
+                    $formattedDate = $copticDateService->formatSearchLabel($copticDate, 'verbal');
 
                     $data['synaxarium'] = [
                         [
                             'title_ar' => 'السنكسار',
-                            'intonation' => 'اليوم ' . ($synaxariumData['coptic_date'] ?? ''),
+                            'intonation' => $formattedDate,
                             'conclusion' => null,
                             'text_ar' => $textAr,
                             'text_co' => [],

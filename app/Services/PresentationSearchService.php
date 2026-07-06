@@ -304,13 +304,17 @@ class PresentationSearchService
         $textContent = $data['content'];
         $textAr = array_values(array_filter(array_map('trim', explode("\n", $textContent))));
 
-        // ✅ Use the CopticDateService to format the date properly
+        // ✅ Use the CopticDateService to format the date verbally
         $copticDate = $data['coptic_date'] ?? $filename;
-        $formattedDate = $this->copticDateService->formatSearchLabel($copticDate);
+        $formattedDate = $this->copticDateService->formatSearchLabel($copticDate, 'verbal');
+        // إذا أردت الصيغة المختصرة: $formattedDate = $this->copticDateService->formatSearchLabel($copticDate, 'short');
 
-        // ✅ Get the first line as the title (if available)
+        // ✅ Clean the first line: remove numbers and extract only the title
         $firstLine = !empty($textAr) ? $textAr[0] : '';
-        $title = $firstLine ?: 'السنكسار';
+        $cleanTitle = $this->cleanSynaxariumTitle($firstLine);
+
+        // ✅ Use cleaned title for display
+        $title = $cleanTitle ?: 'السنكسار';
 
         $lines = [];
         foreach ($textAr as $text) {
@@ -326,7 +330,7 @@ class PresentationSearchService
             'section_code' => 'synaxarium',
             'section_name' => 'السنكسار',
             'title' => $title,
-            'intonation' => 'اليوم ' . $formattedDate,
+            'intonation' => $formattedDate, // ✅ الآن "اليوم الثلاثون من شهر بؤونة"
             'conclusion' => null,
             'lines' => $lines,
             'has_coptic' => false,
@@ -335,10 +339,33 @@ class PresentationSearchService
         $results[] = [
             'source' => 'synaxarium',
             'file' => $filename,
-            // ✅ Label format: السنكسار — 2 أمشير — استشهاد القديس يوحنا المعمدان
-            'label' => 'السنكسار — ' . $formattedDate,
+            // ✅ Label format: السنكسار — اليوم الثلاثون من شهر بؤونة — استشهاد القديس يوحنا المعمدان
+            'label' => 'السنكسار — ' . $formattedDate . ($cleanTitle ? ' — ' . $cleanTitle : ''),
             'slide' => $slide,
         ];
+    }
+
+    /**
+     * Clean the synaxarium title by removing numbers and unnecessary prefixes
+     *
+     * @param string $title Raw title from the first line
+     * @return string Cleaned title
+     */
+    private function cleanSynaxariumTitle(string $title): string
+    {
+        // Remove leading numbers and dots (e.g., "1. ", "2- ", "3- استشهاد...")
+        $title = preg_replace('/^[\d]+[\s\.\-–—]*/', '', $title);
+
+        // Remove أي تكرار لـ "السنكسار" في بداية النص
+        $title = preg_replace('/^السنكسار[\s\-–—]*/', '', $title);
+
+        // Remove أي تكرار لـ "اليوم" في بداية النص
+        $title = preg_replace('/^اليوم[\s\d\/\-–—]*/', '', $title);
+
+        // Trim extra spaces
+        $title = trim($title);
+
+        return $title;
     }
 
     /**
