@@ -38,33 +38,30 @@ class PresentationController extends Controller
         unset($sectionsRaw['Day']);
         unset($sectionsRaw['style']);
 
-        // ✅ Transform sections - using title_ar from JSON
+        // ✅ Transform sections - supporting both old (plain string array) and new (object array) formats
         $sections = collect($sectionsRaw)
             ->map(function ($items, $key) {
                 if (! is_array($items)) {
                     return null;
                 }
 
-                $firstReading = $items[0] ?? null;
+                // Normalize items to [{title_ar, text_ar, intonation, conclusion, ...}] format
+                $readings = $this->normalizeLectionaryItems($items, $key);
 
-                $sectionName = match (true) {
-                    is_array($firstReading) => $firstReading['title_ar'] ?? $key,
-                    is_string($firstReading) => $firstReading,
-                    default => $key,
-                };
+                if (empty($readings)) {
+                    return null;
+                }
+
+                $sectionName = $readings[0]['title_ar'] ?? $key;
 
                 return [
                     'id' => $key,
                     'code' => $key,
                     'name_ar' => $sectionName,
-                    'readings' => collect($items)
+                    'readings' => collect($readings)
                         ->map(function ($reading, $index) use ($sectionName) {
-                            if (! is_array($reading) || ! isset($reading['text_ar'])) {
-                                return null;
-                            }
-
-                            $lines = ReadingLineAssembler::buildLines($reading);
-                            $hasCoptic = ReadingLineAssembler::readingHasCoptic($lines);
+                            $lines = \App\Support\ReadingLineAssembler::buildLines($reading);
+                            $hasCoptic = \App\Support\ReadingLineAssembler::readingHasCoptic($lines);
 
                             return [
                                 'id' => $index + 1,
@@ -76,12 +73,13 @@ class PresentationController extends Controller
                                 'style' => 1,
                             ];
                         })
-                        ->filter()
+                        ->filter(fn ($r) => ! empty($r['lines']))
                         ->values(),
                 ];
             })
             ->filter(fn ($s) => $s !== null && $s['readings']->isNotEmpty())
             ->values();
+
 
         // ✅ Build slides using title_ar
         $slides = [];
@@ -131,10 +129,15 @@ class PresentationController extends Controller
     public function liturgy(Request $request, ContentService $content)
     {
 
-        $dayKey = (int) $request->input('dayKey.dayKey');
-        $dayName = $request->input('dayName.dayName');
-        $season = $request->input('season.season');
-        Log::info('$dayName: ' . $dayName);
+        //$dayKey = (int) $request->input('dayKey.dayKey');
+        //$dayName = $request->input('dayName.dayName');
+        //$season = $request->input('season.season');
+        $season = $request->input('season', $request->input('season.season', 'annual'));
+
+        $dayKey = (int) ($request->input('dayKey') ?? $request->input('dayKey.dayKey') ?? 0);
+        $dayName = $request->input('dayName') ?? $request->input('dayName.dayName') ?? '';
+
+        Log::info('Liturgy Request - season: ' . $season . ', dayKey: ' . $dayKey . ', dayName: ' . $dayName);
         $churchSettingsRaw = $request->cookie('church_settings');
         $churchSettings = [];
         if ($churchSettingsRaw) {
@@ -175,6 +178,11 @@ class PresentationController extends Controller
         }
 
         if (! $Data) {
+            $lectionaryData = $content->getLectionary($dayKey, $season);
+            if ($lectionaryData) {
+                return $this->lectionary($request, (string)$dayKey, $content);
+            }
+
             return Inertia::render('PresentationPage', [
                 'dayKey' => $dayKey,
                 'copticDate' => '',
@@ -291,6 +299,13 @@ class PresentationController extends Controller
             ];
         }
         //dd($slides);
+        if (empty($slides)) {
+            $lectionaryData = $content->getLectionary($dayKey, $season);
+            if ($lectionaryData) {
+                return $this->lectionary($request, (string)$dayKey, $content);
+            }
+        }
+
         return Inertia::render('PresentationPage', [
             'dayKey' => $dayKey,
             'sections' => $sections,
@@ -320,8 +335,21 @@ class PresentationController extends Controller
             return response()->json(['results' => []]);
         }
 
+        $type = $request->query('type', 'liturgy');
+        Log::info('🔍 Presentation Search Request', [
+            'q' => $q,
+            'type_from_query' => $request->query('type'),
+            'type_final' => $type,
+            'all_query_params' => $request->query(), // جميع الـ parameters
+            'full_url' => $request->fullUrl(), // الرابط الكامل
+            'headers' => $request->headers->all(), // جميع الـ headers
+        ]);
+        if (! in_array($type, ['liturgy', 'lectionary', 'synaxarium','all'], true)) {
+            $type = 'all';
+        }
+
         return response()->json([
-            'results' => $presentationSearchService->search($q),
+            'results' => $presentationSearchService->search($q, $type),
         ]);
     }
 
@@ -337,5 +365,51 @@ class PresentationController extends Controller
         }
 
         return '';
+    }
+
+    /**
+     * Normalize lectionary section items to a unified format:
+     * [['title_ar' => ..., 'text_ar' => [...], 'intonation' => ..., 'conclusion' => ...], ...]
+     *
+     * Supports:
+     *   - Old format: ["Section Title", "line1", "line2", ...]
+     *   - New format: [{"title_ar": ..., "text_ar": [...], ...}, ...]
+     */
+    private function normalizeLectionaryItems(array $items, string $fallbackKey): array
+    {
+        if (empty($items)) {
+            return [];
+        }
+
+        $firstItem = $items[0] ?? null;
+
+        // Old format: first element is a string (title), rest are text lines
+        if (is_string($firstItem)) {
+            $title = $firstItem;
+            $body = array_slice($items, 1);
+            // Filter out any non-string values
+            $body = array_values(array_filter($body, fn($v) => is_string($v) || is_numeric($v)));
+
+            return [
+                [
+                    'title_ar'   => $title,
+                    'intonation' => null,
+                    'conclusion' => null,
+                    'text_ar'    => $body,
+                    'text_co'    => [],
+                    'text_ar_co' => [],
+                ],
+            ];
+        }
+
+        // New format: each element is an associative array with text_ar
+        $out = [];
+        foreach ($items as $item) {
+            if (is_array($item) && isset($item['text_ar'])) {
+                $out[] = $item;
+            }
+        }
+
+        return $out;
     }
 }

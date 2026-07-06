@@ -10,13 +10,13 @@ import {
     Moon as MoonIcon,
     Sparkles,
     Sun,
+    Search,
 } from 'lucide-react';
 import { useMemo, useEffect, useState } from 'react';
 import { DateSelector } from '@/components/DateSelector';
 import { router } from '@inertiajs/react';
 import { useDayContext } from '@/contexts/DayContext';
 import { SearchOverlay } from '@/components/SearchOverlay';
-
 
 // Types from the controller
 /**
@@ -112,30 +112,149 @@ export default function Dashboard({
     const currentSeasonStyle = useMemo(() => {
         return seasonStyles[season] || seasonStyles.annual;
     }, [season]);
-    const [searchOpen, setSearchOpen] = useState(false);
 
+    // State for search overlays
+    const [lectionarySearchOpen, setLectionarySearchOpen] = useState(false);
+    const [liturgySearchOpen, setLiturgySearchOpen] = useState(false);
 
+    /**
+     * Handle local search result from the lectionary search overlay.
+     * This is used when the search overlay is in "local" mode.
+     * Expected signature: (slideId: string, query: string) => void
+     */
+    const handleLectionaryLocalResult = (slideId: string, query: string) => {
+        const match = slideId.match(/^(lectionary|synaxarium)-([a-zA-Z0-9_]+)/);
+        if (match) {
+            const matchedDayKey = match[2];
+            router.visit(`/presentation/lectionary/${matchedDayKey}?season=${season}`);
+            setLectionarySearchOpen(false);
+        }
+    };
+
+    /**
+     * Handle local search result from the liturgy search overlay.
+     * Expected signature: (slideId: string, query: string) => void
+     */
+    const handleLiturgyLocalResult = (slideId: string, query: string) => {
+        // For liturgy, we navigate to the liturgy page with the current day context
+        const params = new URLSearchParams({
+            season: season,
+            dayKey: dayKey,
+            dayName: dayName
+        });
+        router.visit(`/presentation/liturgy?${params.toString()}`);
+        setLiturgySearchOpen(false);
+    };
+
+    /**
+     * Handle global insert from search overlay.
+     * Expected signature: (slide: Record<string, unknown>) => void
+     * This is used when the search overlay is in "insert" mode.
+     */
+    const handleGlobalInsert = (slide: Record<string, unknown>) => {
+        // Try to extract dayKey from the slide
+        const slideId = (slide.id as string) || '';
+        const dayKeyFromSlide = (slide.day_key as string) || '';
+
+        if (dayKeyFromSlide) {
+            router.visit(`/presentation/lectionary/${dayKeyFromSlide}?season=${season}`);
+            return;
+        }
+
+        // Extract from slide ID
+        const match = slideId.match(/^(lectionary|synaxarium)-([a-zA-Z0-9_]+)/);
+        if (match) {
+            const matchedDayKey = match[2];
+            router.visit(`/presentation/lectionary/${matchedDayKey}?season=${season}`);
+            return;
+        }
+
+        // Fallback: try to extract from any field that might contain the day key
+        const possibleDayKey =
+            (slide.day_key as string) ||
+            (slide.dayKey as string) ||
+            (slide.date_key as string) ||
+            (slide.key as string);
+
+        if (possibleDayKey) {
+            router.visit(`/presentation/lectionary/${possibleDayKey}?season=${season}`);
+        }
+    };
+
+    // Keyboard shortcuts
     useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Ctrl+K or Cmd+K to open lectionary search
+            if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+                e.preventDefault();
+                setLectionarySearchOpen(true);
+            }
 
-    }, [dayKey, copticDate.formatted, seasonLabel, setDateContext]);
+            // Ctrl+Shift+K or Cmd+Shift+K to open liturgy search
+            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'K') {
+                e.preventDefault();
+                setLiturgySearchOpen(true);
+            }
 
-     useEffect(() => {
-            const h = (e: KeyboardEvent) => {
-                if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-                    e.preventDefault();
-                    setSearchOpen(true);
-                }
-                if (e.key === 'f' && (e.target as HTMLElement).tagName !== 'INPUT') {
-                    e.preventDefault();
-                }
-            };
-            window.addEventListener('keydown', h);
-            return () => window.removeEventListener('keydown', h);
-        },);
+            // Prevent default F key behavior (browser find) if not in input
+            if (e.key === 'f' && (e.target as HTMLElement).tagName !== 'INPUT') {
+                e.preventDefault();
+            }
+        };
 
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, []);
+
+    // Update day context when day changes
+    useEffect(() => {
+        // تحديث السياق بالمعاملات المطلوبة: (date, coptic, season, readings)
+        setDateContext(
+            gregorianDateISO, // date
+            copticDate.formatted, // coptic
+            season, // season
+            [] // readings (فارغ مؤقتاً)
+        );
+    }, [dayKey, copticDate.formatted, season, gregorianDateISO, setDateContext]);
+
+    /**
+     * Navigate to the lectionary presentation for the current day.
+     */
+    const navigateToLectionary = () => {
+        router.visit(`/presentation/lectionary/${dayKey}?season=${season}`);
+    };
+
+    /**
+     * Navigate to the liturgy presentation for the current day.
+     */
+    const navigateToLiturgy = () => {
+        const params = new URLSearchParams({
+            season: season,
+            dayKey: dayKey,
+            dayName: dayName
+        });
+        router.visit(`/presentation/liturgy?${params.toString()}`);
+    };
 
     return (
         <HosLayout title="قراءات اليوم">
+            {/* Search Overlays */}
+            <SearchOverlay
+                open={lectionarySearchOpen}
+                onOpenChange={setLectionarySearchOpen}
+                onGlobalInsert={handleGlobalInsert}
+                onLocalResult={handleLectionaryLocalResult}
+                searchType="lectionary"
+            />
+
+            <SearchOverlay
+                open={liturgySearchOpen}
+                onOpenChange={setLiturgySearchOpen}
+                onGlobalInsert={handleGlobalInsert}
+                onLocalResult={handleLiturgyLocalResult}
+                searchType="liturgy"
+            />
+
             <div className="space-y-6">
                 {/* Hero Card — Today's date and season */}
                 <div
@@ -184,9 +303,9 @@ export default function Dashboard({
 
                         {/* Quick Actions */}
                         <div className="flex flex-col gap-2 justify-center">
-                             <>
+                            <>
                                 <Link
-                                    href={`#`}
+                                    href={`/presentation/lectionary/${dayKey}?season=${season}`}
                                     className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:opacity-90 hover:shadow-md active:scale-[0.98]"
                                 >
                                     <BookOpen className="h-4 w-4" />
@@ -201,15 +320,16 @@ export default function Dashboard({
                                     عرض القداس
                                 </Link>
 
-                                <Link
-                                    href={`#`}
-                                    className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground shadow-sm transition-all hover:bg-muted active:scale-[0.98]"
+                                <button
+                                    type="button"
+                                    onClick={() => setLiturgySearchOpen(true)}
+                                    className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground shadow-sm transition-all hover:bg-muted active:scale-[0.98] cursor-pointer"
+                                    title="Ctrl+Shift+K للبحث في القداس"
                                 >
-                                    <Mic className="h-4 w-4" />
+                                    <Search className="h-4 w-4" />
                                     استماع للقداس
-                                </Link>
+                                </button>
                             </>
-
                         </div>
                     </div>
                 </div>
@@ -221,15 +341,12 @@ export default function Dashboard({
                     </h2>
                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
 
-                    {/* الحاوية الرئيسية أصبحت div بدلاً من Link */}
+                        {/* Lectionary Section */}
                         <div className="group flex flex-col sm:flex-row items-start sm:items-center gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm transition-all hover:shadow-md">
-
-                            {/* الجزء الأيمن: الأيقونة والعنوان */}
                             <div className="flex items-center gap-4 flex-1 min-w-0">
                                 <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
                                     <BookOpen className="h-6 w-6" />
                                 </div>
-
                                 <div className="min-w-0">
                                     <h1 className="text-base font-bold text-foreground font-reading mb-0.5">
                                         القطمارس
@@ -237,73 +354,66 @@ export default function Dashboard({
                                 </div>
                             </div>
 
-                            {/* الجزء الأيسر: أزرار الأكشن */}
-                             <div className="flex items-center gap-1 w-full sm:w-auto shrink-0 border-t sm:border-t-0 pt-3 sm:pt-0">
-                                <Link
-                                    href={`/presentation/lectionary/${dayKey}?season=${season}`}
-                                    className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400 px-2 py-2 text-sm font-bold shadow-sm transition-all hover:bg-amber-500/20 active:scale-[0.96]"
+                            <div className="flex items-center gap-1 w-full sm:w-auto shrink-0 border-t sm:border-t-0 pt-3 sm:pt-0">
+                                <button
+                                    type="button"
+                                    onClick={navigateToLectionary}
+                                    className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400 px-2 py-2 text-sm font-bold shadow-sm transition-all hover:bg-amber-500/20 active:scale-[0.96] cursor-pointer"
                                 >
                                     <Monitor className="h-4 w-4" />
                                     <span>عرض</span>
-                                </Link>
+                                </button>
 
-                                <Link
-                                    href={`#`}
-                                    className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1 rounded-xl border border-border bg-background px-2 py-2 text-sm font-medium text-foreground shadow-sm transition-all hover:bg-muted active:scale-[0.96]"
+                                <button
+                                    type="button"
+                                    onClick={() => setLectionarySearchOpen(true)}
+                                    className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1 rounded-xl border border-border bg-background px-2 py-2 text-sm font-medium text-foreground shadow-sm transition-all hover:bg-muted active:scale-[0.96] cursor-pointer"
+                                    title="Ctrl+K للبحث في القطمارس"
                                 >
-                                    <Mic className="h-4 w-4" />
+                                    <Search className="h-4 w-4" />
                                     <span>بحث</span>
-                                </Link>
-                                <SearchOverlay
-                                    open={searchOpen}
-                                    onOpenChange={setSearchOpen}
-                                    onLocalResult={handleLocalSearchResult}
-                                    onGlobalInsert={handleGlobalInsert}
-                                    slides={deck}
-                                />
+                                </button>
                             </div>
                         </div>
-                        <div className="group flex flex-col sm:flex-row items-start sm:items-center gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm transition-all hover:shadow-md">
 
+                        {/* Liturgy Section */}
+                        <div className="group flex flex-col sm:flex-row items-start sm:items-center gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm transition-all hover:shadow-md">
                             <div className="flex items-center gap-4 flex-1 min-w-0">
                                 <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
                                     <BookOpen className="h-6 w-6" />
                                 </div>
-
                                 <div className="min-w-0">
                                     <h1 className="text-base font-bold text-foreground font-reading mb-0.5">
-                                       القداس الالهي
+                                        القداس الالهي
                                     </h1>
                                 </div>
                             </div>
 
-                             <div className="flex items-center gap-1 w-full sm:w-auto shrink-0 border-t sm:border-t-0 pt-3 sm:pt-0">
-                                <Link
-                                    href={`/presentation/liturgy`}
-                                    data={{
-                                        season: {season} ,
-                                        dayName: {dayName},
-                                        dayKey: {dayKey}
-                                    }}
-
-                                    className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400 px-2 py-2 text-sm font-bold shadow-sm transition-all hover:bg-amber-500/20 active:scale-[0.96]"
+                            <div className="flex items-center gap-1 w-full sm:w-auto shrink-0 border-t sm:border-t-0 pt-3 sm:pt-0">
+                                <button
+                                    type="button"
+                                    onClick={navigateToLiturgy}
+                                    className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400 px-2 py-2 text-sm font-bold shadow-sm transition-all hover:bg-amber-500/20 active:scale-[0.96] cursor-pointer"
                                 >
                                     <Monitor className="h-4 w-4" />
                                     <span>عرض</span>
-                                </Link>
+                                </button>
 
-                                <Link
-                                    href={`#`}
-                                    className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1 rounded-xl border border-border bg-background px-2 py-2 text-sm font-medium text-foreground shadow-sm transition-all hover:bg-muted active:scale-[0.96]"
+                                <button
+                                    type="button"
+                                    onClick={() => setLiturgySearchOpen(true)}
+                                    className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1 rounded-xl border border-border bg-background px-2 py-2 text-sm font-medium text-foreground shadow-sm transition-all hover:bg-muted active:scale-[0.96] cursor-pointer"
+                                    title="Ctrl+Shift+K للبحث في القداس"
                                 >
-                                    <Mic className="h-4 w-4" />
-                                    <span>استماع</span>
-                                </Link>
+                                    <Search className="h-4 w-4" />
+                                    <span>بحث</span>
+                                </button>
                             </div>
                         </div>
 
+                        {/* Other sections (placeholder) */}
                         <Link
-                            href={`/#`}
+                            href={`/presentation/lectionary/${dayKey}?season=${season}&mode=vespers`}
                             className="group flex items-center gap-4 rounded-xl border border-border bg-card p-4 shadow-sm transition-all hover:border-primary/20 hover:shadow-md active:scale-[0.98]"
                         >
                             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
@@ -313,12 +423,12 @@ export default function Dashboard({
                                 <h3 className="truncate text-sm font-semibold text-foreground">
                                     رفع بخور عشية
                                 </h3>
-
                             </div>
                             <ChevronLeft className="h-4 w-4 shrink-0 text-muted-foreground/50 transition-transform group-hover:-translate-x-1 rtl:rotate-0" />
                         </Link>
+
                         <Link
-                            href={`/#`}
+                            href={`/presentation/lectionary/${dayKey}?season=${season}&mode=agpeya`}
                             className="group flex items-center gap-4 rounded-xl border border-border bg-card p-4 shadow-sm transition-all hover:border-primary/20 hover:shadow-md active:scale-[0.98]"
                         >
                             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
@@ -328,12 +438,12 @@ export default function Dashboard({
                                 <h3 className="truncate text-sm font-semibold text-foreground">
                                     الاجبية
                                 </h3>
-
                             </div>
                             <ChevronLeft className="h-4 w-4 shrink-0 text-muted-foreground/50 transition-transform group-hover:-translate-x-1 rtl:rotate-0" />
                         </Link>
+
                         <Link
-                            href={`/#`}
+                            href={`/presentation/lectionary/${dayKey}?season=${season}&mode=psalms`}
                             className="group flex items-center gap-4 rounded-xl border border-border bg-card p-4 shadow-sm transition-all hover:border-primary/20 hover:shadow-md active:scale-[0.98]"
                         >
                             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
@@ -343,12 +453,12 @@ export default function Dashboard({
                                 <h3 className="truncate text-sm font-semibold text-foreground">
                                     تسبحة
                                 </h3>
-
                             </div>
                             <ChevronLeft className="h-4 w-4 shrink-0 text-muted-foreground/50 transition-transform group-hover:-translate-x-1 rtl:rotate-0" />
                         </Link>
+
                         <Link
-                            href={`/#`}
+                            href={`/presentation/lectionary/${dayKey}?season=${season}&mode=hymns`}
                             className="group flex items-center gap-4 rounded-xl border border-border bg-card p-4 shadow-sm transition-all hover:border-primary/20 hover:shadow-md active:scale-[0.98]"
                         >
                             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
@@ -358,13 +468,10 @@ export default function Dashboard({
                                 <h3 className="truncate text-sm font-semibold text-foreground">
                                     ترانيم
                                 </h3>
-
                             </div>
                             <ChevronLeft className="h-4 w-4 shrink-0 text-muted-foreground/50 transition-transform group-hover:-translate-x-1 rtl:rotate-0" />
                         </Link>
                     </div>
-
-
                 </div>
             </div>
         </HosLayout>

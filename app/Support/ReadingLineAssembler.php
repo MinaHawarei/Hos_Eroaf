@@ -29,11 +29,16 @@ final class ReadingLineAssembler
             $coText = $textCo[$i] ?? '';
             $arCoText = $textArCo[$i] ?? '';
 
+            // Explicitly handle null placeholders
+            if (is_null($arText)) $arText = '';
+            if (is_null($coText)) $coText = '';
+            if (is_null($arCoText)) $arCoText = '';
+
             if (! empty($arText)) {
                 $lines[] = [
                     'id' => $lineOrder++,
                     'lang_type' => 'arabic',
-                    'text' => $arText,
+                    'text' => (string) $arText,
                     'speaker' => $speaker,
                 ];
             }
@@ -42,7 +47,7 @@ final class ReadingLineAssembler
                 $lines[] = [
                     'id' => $lineOrder++,
                     'lang_type' => 'coptic_arabized',
-                    'text' => $arCoText,
+                    'text' => (string) $arCoText,
                     'speaker' => $speaker,
                 ];
             }
@@ -51,7 +56,7 @@ final class ReadingLineAssembler
                 $lines[] = [
                     'id' => $lineOrder++,
                     'lang_type' => 'coptic',
-                    'text' => $coText,
+                    'text' => (string) $coText,
                     'speaker' => $speaker,
                 ];
             }

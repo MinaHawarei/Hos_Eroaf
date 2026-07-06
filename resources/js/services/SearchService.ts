@@ -15,8 +15,10 @@ export class SearchService {
      * Normalization rules:
      * 1. Strip Tashkeel (Range \u064B to \u065F) and Kashida (\u0640).
      * 2. Unify all Alef forms (أ, إ, آ, ا) to a bare Alef (ا).
-     * 3. Unify Teh Marbuta (ة) to Heh (ه).
-     * 4. Unify Alef Maksura (ى) to Yeh (ي).
+     * 3. Unify Hamza-on-Waw (ؤ) to Waw (و).
+     * 4. Unify Hamza-on-Ya (ئ) to Ya (ي).
+     * 5. Unify Teh Marbuta (ة) to Heh (ه).
+     * 6. Unify Alef Maksura (ى) to Yeh (ي).
      * 
      * @param str - The raw Arabic string.
      * @returns The normalized, simplified string for comparison.
@@ -32,6 +34,12 @@ export class SearchService {
 
         // Unify Alefs
         normalized = normalized.replace(/[أإآ]/g, 'ا');
+
+        // Unify Hamza-on-Waw to Waw
+        normalized = normalized.replace(/ؤ/g, 'و');
+
+        // Unify Hamza-on-Ya to Ya
+        normalized = normalized.replace(/ئ/g, 'ي');
 
         // Unify Teh Marbuta to Heh
         normalized = normalized.replace(/ة/g, 'ه');
@@ -90,10 +98,13 @@ export class SearchService {
                 return '[اأإآ]';
             }
             if (char === 'ه') {
-                return '[ههة]';
+                return '[هة]';
+            }
+            if (char === 'و') {
+                return '[وؤ]';
             }
             if (char === 'ي') {
-                return '[ييى]';
+                return '[ييىئ]';
             }
             if (char === ' ') {
                 return '\\s+';

@@ -4,14 +4,34 @@ namespace App\Services;
 
 use App\Support\ReadingLineAssembler;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Log;
 
 class PresentationSearchService
 {
-    private const LectionaryDir = 'content/lectionary';
-
-    private const LiturgyDir = 'content/liturgy';
+    private const AllDir = 'storage/content';
+    private const LectionaryDir = 'storage/content/lectionary';
+    private const LiturgyDir = 'storage/content/liturgy';
+    private const SynaxariumDir = 'storage/content/lectionary/synaxarium';
 
     /**
+     * @var CopticDateService
+     */
+    private CopticDateService $copticDateService;
+
+    /**
+     * Constructor
+     */
+    public function __construct(CopticDateService $copticDateService)
+    {
+        $this->copticDateService = $copticDateService;
+    }
+
+    /**
+     * Search for content across different liturgical sources
+     *
+     * @param string $query The search query
+     * @param string $type Search scope: 'all', 'liturgy', 'lectionary', or 'synaxarium'
+     * @param int $limit Maximum number of results to return
      * @return array<int, array{
      *     source: string,
      *     file: string,
@@ -19,7 +39,7 @@ class PresentationSearchService
      *     slide: array<string, mixed>
      * }>
      */
-    public function search(string $query, int $limit = 60): array
+    public function search(string $query, string $type = 'all', int $limit = 60): array
     {
         $normalizedQuery = $this->normalizeArabic($query);
         if ($normalizedQuery === '') {
@@ -29,42 +49,48 @@ class PresentationSearchService
         $results = [];
         $base = base_path();
 
-        $lectionaryPath = $base.DIRECTORY_SEPARATOR.self::LectionaryDir;
-        if (is_dir($lectionaryPath)) {
-            foreach (File::files($lectionaryPath) as $fileInfo) {
-                if (strtolower($fileInfo->getExtension()) !== 'json') {
-                    continue;
-                }
-                $this->searchLectionaryFile($fileInfo->getPathname(), $fileInfo->getFilename(), $normalizedQuery, $results, $limit);
-                if (count($results) >= $limit) {
-                    return $results;
-                }
+        // 1. ALL: Search everything (Liturgy + Lectionary + Synaxarium)
+        if ($type === 'all') {
+            // Search Liturgy
+            $this->searchLiturgyDirectory($base, $normalizedQuery, $results, $limit);
+            if (count($results) >= $limit) {
+                return $results;
+            }
+
+            // Search Lectionary
+            $this->searchLectionaryDirectory($base, $normalizedQuery, $results, $limit);
+            if (count($results) >= $limit) {
+                return $results;
+            }
+
+            // Search Synaxarium
+            $this->searchSynaxariumDirectory($base, $normalizedQuery, $results, $limit);
+            if (count($results) >= $limit) {
+                return $results;
             }
         }
 
-        $synaxariumPath = $lectionaryPath.DIRECTORY_SEPARATOR.'synaxarium';
-        if (is_dir($synaxariumPath)) {
-            foreach (File::files($synaxariumPath) as $fileInfo) {
-                if (strtolower($fileInfo->getExtension()) !== 'json') {
-                    continue;
-                }
-                $this->searchSynaxariumFile($fileInfo->getPathname(), $fileInfo->getFilename(), $normalizedQuery, $results, $limit);
-                if (count($results) >= $limit) {
-                    return $results;
-                }
+        // 2. LITURGY: Search only the Divine Liturgy
+        if ($type === 'liturgy') {
+            $this->searchLiturgyDirectory($base, $normalizedQuery, $results, $limit);
+            if (count($results) >= $limit) {
+                return $results;
             }
         }
 
-        $liturgyPath = $base.DIRECTORY_SEPARATOR.self::LiturgyDir;
-        if (is_dir($liturgyPath)) {
-            foreach (File::files($liturgyPath) as $fileInfo) {
-                if (strtolower($fileInfo->getExtension()) !== 'json') {
-                    continue;
-                }
-                $this->searchLiturgyFile($fileInfo->getPathname(), $fileInfo->getFilename(), $normalizedQuery, $results, $limit);
-                if (count($results) >= $limit) {
-                    break;
-                }
+        // 3. LECTIONARY: Search only the Lectionary (Katamaros)
+        if ($type === 'lectionary') {
+            $this->searchLectionaryDirectory($base, $normalizedQuery, $results, $limit);
+            if (count($results) >= $limit) {
+                return $results;
+            }
+        }
+
+        // 4. SYNAXARIUM: Search only the Synaxarium
+        if ($type === 'synaxarium') {
+            $this->searchSynaxariumDirectory($base, $normalizedQuery, $results, $limit);
+            if (count($results) >= $limit) {
+                return $results;
             }
         }
 
@@ -72,7 +98,94 @@ class PresentationSearchService
     }
 
     /**
-     * @param  array<int, array<string, mixed>>  $results
+     * Search all files in the Liturgy directory
+     */
+    private function searchLiturgyDirectory(string $base, string $normalizedQuery, array &$results, int $limit): void
+    {
+        $liturgyPath = $base . DIRECTORY_SEPARATOR . self::LiturgyDir;
+        if (!is_dir($liturgyPath)) {
+            return;
+        }
+
+        foreach (File::files($liturgyPath) as $fileInfo) {
+            if (strtolower($fileInfo->getExtension()) !== 'json') {
+                continue;
+            }
+            $this->searchLiturgyFile(
+                $fileInfo->getPathname(),
+                $fileInfo->getFilename(),
+                $normalizedQuery,
+                $results,
+                $limit
+            );
+            if (count($results) >= $limit) {
+                return;
+            }
+        }
+    }
+
+    /**
+     * Search all files in the Lectionary directory (excluding Synaxarium)
+     */
+    private function searchLectionaryDirectory(string $base, string $normalizedQuery, array &$results, int $limit): void
+    {
+        $lectionaryPath = $base . DIRECTORY_SEPARATOR . self::LectionaryDir;
+        if (!is_dir($lectionaryPath)) {
+            return;
+        }
+
+        foreach (File::files($lectionaryPath) as $fileInfo) {
+            if (strtolower($fileInfo->getExtension()) !== 'json') {
+                continue;
+            }
+            $this->searchLectionaryFile(
+                $fileInfo->getPathname(),
+                $fileInfo->getFilename(),
+                $normalizedQuery,
+                $results,
+                $limit
+            );
+            if (count($results) >= $limit) {
+                return;
+            }
+        }
+    }
+
+    /**
+     * Search all files in the Synaxarium directory
+     */
+    private function searchSynaxariumDirectory(string $base, string $normalizedQuery, array &$results, int $limit): void
+    {
+        $synaxariumPath = $base . DIRECTORY_SEPARATOR . self::SynaxariumDir;
+        if (!is_dir($synaxariumPath)) {
+            return;
+        }
+
+        foreach (File::files($synaxariumPath) as $fileInfo) {
+            if (strtolower($fileInfo->getExtension()) !== 'json') {
+                continue;
+            }
+            $this->searchSynaxariumFile(
+                $fileInfo->getPathname(),
+                $fileInfo->getFilename(),
+                $normalizedQuery,
+                $results,
+                $limit
+            );
+            if (count($results) >= $limit) {
+                return;
+            }
+        }
+    }
+
+    /**
+     * Search a single Lectionary file for matching content
+     *
+     * @param string $path Full path to the file
+     * @param string $filename Name of the file
+     * @param string $normalizedQuery Normalized search query
+     * @param array<int, array<string, mixed>> $results Reference to results array
+     * @param int $limit Maximum results limit
      */
     private function searchLectionaryFile(string $path, string $filename, string $normalizedQuery, array &$results, int $limit): void
     {
@@ -90,7 +203,8 @@ class PresentationSearchService
         $dayLabel = is_string($data['Day'] ?? null) ? (string) $data['Day'] : $filename;
 
         foreach ($data as $sectionKey => $items) {
-            if (in_array($sectionKey, ['Day', 'style', 'seasonLabel'], true)) {
+            // Skip metadata keys
+            if (in_array($sectionKey, ['Day', 'style', 'seasonLabel', 'synaxarium'], true)) {
                 continue;
             }
             if (! is_array($items)) {
@@ -137,7 +251,9 @@ class PresentationSearchService
     }
 
     /**
-     * @param  array<int, mixed>  $items
+     * Normalize lectionary section items into a consistent format
+     *
+     * @param array<int, mixed> $items Raw section items
      * @return array<int, array<string, mixed>>
      */
     private function normalizeLectionarySectionItems(array $items): array
@@ -146,6 +262,7 @@ class PresentationSearchService
             return [];
         }
 
+        // Handle string-based sections (e.g., ["Title", "line1", "line2"])
         if (isset($items[0]) && is_string($items[0])) {
             $title = (string) $items[0];
             $body = array_slice($items, 1);
@@ -162,6 +279,7 @@ class PresentationSearchService
             ];
         }
 
+        // Handle array-based sections
         $out = [];
         foreach ($items as $item) {
             if (is_array($item) && isset($item['text_ar'])) {
@@ -172,6 +290,9 @@ class PresentationSearchService
         return $out;
     }
 
+    /**
+     * Search a single Synaxarium file for matching content
+     */
     private function searchSynaxariumFile(string $path, string $filename, string $normalizedQuery, array &$results, int $limit): void
     {
         $raw = file_get_contents($path);
@@ -183,8 +304,13 @@ class PresentationSearchService
         $textContent = $data['content'];
         $textAr = array_values(array_filter(array_map('trim', explode("\n", $textContent))));
 
-        $dayLabel = $data['coptic_date'] ?? $filename;
-        $title = 'السنكسار';
+        // ✅ Use the CopticDateService to format the date properly
+        $copticDate = $data['coptic_date'] ?? $filename;
+        $formattedDate = $this->copticDateService->formatSearchLabel($copticDate);
+
+        // ✅ Get the first line as the title (if available)
+        $firstLine = !empty($textAr) ? $textAr[0] : '';
+        $title = $firstLine ?: 'السنكسار';
 
         $lines = [];
         foreach ($textAr as $text) {
@@ -198,24 +324,31 @@ class PresentationSearchService
         $slide = [
             'id' => 'global-synaxarium-'.pathinfo($filename, PATHINFO_FILENAME),
             'section_code' => 'synaxarium',
-            'section_name' => $title,
+            'section_name' => 'السنكسار',
             'title' => $title,
-            'intonation' => 'اليوم ' . $dayLabel,
+            'intonation' => 'اليوم ' . $formattedDate,
             'conclusion' => null,
             'lines' => $lines,
             'has_coptic' => false,
         ];
 
         $results[] = [
-            'source' => 'lectionary',
+            'source' => 'synaxarium',
             'file' => $filename,
-            'label' => 'السنكسار — '.$dayLabel,
+            // ✅ Label format: السنكسار — 2 أمشير — استشهاد القديس يوحنا المعمدان
+            'label' => 'السنكسار — ' . $formattedDate,
             'slide' => $slide,
         ];
     }
 
     /**
-     * @param  array<int, array<string, mixed>>  $results
+     * Search a single Liturgy file for matching content
+     *
+     * @param string $path Full path to the file
+     * @param string $filename Name of the file
+     * @param string $normalizedQuery Normalized search query
+     * @param array<int, array<string, mixed>> $results Reference to results array
+     * @param int $limit Maximum results limit
      */
     private function searchLiturgyFile(string $path, string $filename, string $normalizedQuery, array &$results, int $limit): void
     {
@@ -274,7 +407,11 @@ class PresentationSearchService
     }
 
     /**
-     * @param  array<int, array<string, mixed>>  $lines
+     * Check if any line in the given set matches the search query
+     *
+     * @param array<int, array<string, mixed>> $lines Array of line objects
+     * @param string $normalizedQuery Normalized search query
+     * @return bool True if at least one line matches
      */
     private function linesMatch(array $lines, string $normalizedQuery): bool
     {
@@ -291,11 +428,26 @@ class PresentationSearchService
         return false;
     }
 
+    /**
+     * Normalize Arabic text by removing diacritics and unifying characters
+     *
+     * @param string $str The text to normalize
+     * @return string Normalized text
+     */
     private function normalizeArabic(string $str): string
     {
-        $str = preg_replace('/[\x{064B}-\x{065F}\x{0670}]/u', '', $str) ?? '';
+        // Remove Tashkeel (diacritics) and Tatweel (Kashida)
+        $str = preg_replace('/[\x{0640}\x{064B}-\x{065F}\x{0670}]/u', '', $str) ?? '';
+
+        // Unify Hamza variants to a single form
         $str = str_replace(['أ', 'إ', 'آ'], 'ا', $str);
+        $str = str_replace('ؤ', 'و', $str);
+        $str = str_replace('ئ', 'ي', $str);
+
+        // Unify Ta Marbuta to Ha
         $str = str_replace('ة', 'ه', $str);
+
+        // Unify Alef Maksura to Ya
         $str = str_replace('ى', 'ي', $str);
 
         return mb_strtolower($str, 'UTF-8');

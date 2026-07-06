@@ -467,6 +467,9 @@ export default function PresentationPage({
             ...s,
             id: `${s.id}-ins-${Date.now()}`,
         };
+
+        currentSlideIdRef.current = inserted.id;
+
         setDeck((d) => {
             const next = [...d];
             next.splice(currentSlideIndex + 1, 0, inserted);

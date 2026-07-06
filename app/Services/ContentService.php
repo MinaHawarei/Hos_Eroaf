@@ -14,8 +14,11 @@ class ContentService
         if (!file_exists($path)) {
             return null;
         }
-        return json_decode(file_get_contents($path), true);
-
+        $data = json_decode(file_get_contents($path), true);
+        if ($data && isset($data['synaxarium'])) {
+            unset($data['synaxarium']);
+        }
+        return $data;
     }
 
     public function getLectionary(string|int $day, ?string $season = null): ?array
@@ -47,7 +50,23 @@ class ContentService
         }
 
         if (!$data) {
+            // Check if Synaxarium exists as a fallback
+            $synaxariumPath = base_path("storage/content/lectionary/synaxarium/{$file}.json");
+            if (file_exists($synaxariumPath)) {
+                $data = [
+                    'Day' => '',
+                    'style' => 1
+                ];
+            }
+        }
+
+        if (!$data) {
             return null;
+        }
+
+        // Preserve backward compatibility by clearing any existing old-format/new-format synaxarium key
+        if (isset($data['synaxarium'])) {
+            unset($data['synaxarium']);
         }
 
         // ✅ معالجة السنكسار بناءً على الموسم
@@ -71,8 +90,6 @@ class ContentService
                     ];
                 }
             }
-        } else {
-            unset($data['synaxarium']);
         }
 
         return $data;
