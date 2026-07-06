@@ -336,9 +336,6 @@ export default function Dashboard({
 
                 {/* Sections Grid */}
                 <div>
-                    <h2 className="mb-4 text-lg font-semibold text-foreground">
-                        Liturgical Sections
-                    </h2>
                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
 
                         {/* Lectionary Section */}
