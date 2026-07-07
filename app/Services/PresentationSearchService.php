@@ -8,7 +8,6 @@ use Illuminate\Support\Facades\Log;
 
 class PresentationSearchService
 {
-    private const AllDir = 'storage/content';
     private const LectionaryDir = 'storage/content/lectionary';
     private const LiturgyDir = 'storage/content/liturgy';
     private const SynaxariumDir = 'storage/content/lectionary/synaxarium';

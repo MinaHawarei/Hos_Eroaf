@@ -12,57 +12,35 @@ import {
     Sun,
     Search,
 } from 'lucide-react';
-import { useMemo, useEffect, useState } from 'react';
+import { useMemo, useEffect, useState, useCallback, useRef } from 'react';
 import { DateSelector } from '@/components/DateSelector';
 import { router } from '@inertiajs/react';
 import { useDayContext } from '@/contexts/DayContext';
 import { SearchOverlay } from '@/components/SearchOverlay';
 
 // Types from the controller
-/**
- * Represents a section of liturgical readings (e.g., Pauline, Gospel).
- */
 type ReadingSection = {
-    /** Primary key for the section */
     id: number;
-    /** Unique string code for the section */
     code: string;
-    /** Arabic name of the section */
     name_ar: string;
-    /** Number of reading items/slides in this section */
     reading_count: number;
 };
 
-/**
- * Props for the Dashboard component.
- */
 type Props = {
-    /** Detailed Coptic date information */
     copticDate: {
         day: number;
         month: string;
         year: number;
-        /** Full formatted string (e.g., "17 Meshir 1740") */
         formatted: string;
     };
-    /** Formatted Gregorian date string */
     gregorianDate: string;
-    /** Date string in ISO format for processing */
     gregorianDateISO: string;
-    /** Technical key for the current liturgical season */
     season: string;
-    /** Human-readable label for the season */
     seasonLabel: string;
-    /** Unique key identifying the liturgical day for syncing */
     dayKey: string;
-    /** Name of the current day in the liturgical calendar */
     dayName: string;
 };
 
-/**
- * Visual styling configurations for different liturgical seasons.
- * Adjusts gradients, icons, and badge colors to match the seasonal mood.
- */
 const seasonStyles: Record<string, { icon: any; gradient: string; badge: string }> = {
     annual: {
         icon: Sun,
@@ -91,12 +69,6 @@ const seasonStyles: Record<string, { icon: any; gradient: string; badge: string 
     },
 };
 
-/**
- * Dashboard Component
- *
- * The main landing page for users. Displays the current Coptic calendar date,
- * seasonal context, and provides navigation to the lectionary, liturgy, and other modules.
- */
 export default function Dashboard({
     copticDate,
     gregorianDate,
@@ -108,7 +80,6 @@ export default function Dashboard({
 }: Props) {
     const { setDateContext } = useDayContext();
 
-    /** Selects the appropriate visual theme based on the current season */
     const currentSeasonStyle = useMemo(() => {
         return seasonStyles[season] || seasonStyles.annual;
     }, [season]);
@@ -117,55 +88,34 @@ export default function Dashboard({
     const [lectionarySearchOpen, setLectionarySearchOpen] = useState(false);
     const [liturgySearchOpen, setLiturgySearchOpen] = useState(false);
 
+    // ✅ استخدام useRef لتتبع ما إذا تم تحديث السياق بالفعل
+    const contextUpdatedRef = useRef(false);
+
     /**
-     * Handle local search result from the lectionary search overlay.
-     * This is used when the search overlay is in "local" mode.
-     * Expected signature: (slideId: string, query: string) => void
+     * ✅ Handle search result from Dashboard
+     * When a user selects a result from the search overlay in Dashboard,
+     * navigate to the Presentation page with the selected dayKey.
      */
-    const handleLectionaryLocalResult = (slideId: string, query: string) => {
+    const handleDashboardSearchResult = useCallback((slide: Record<string, unknown>) => {
+        // Try to extract dayKey from the slide
+        const slideId = (slide.id as string) || '';
+        const dayKeyFromSlide = (slide.day_key as string) || '';
+
+        // First priority: use explicit day_key if available
+        if (dayKeyFromSlide) {
+            router.visit(`/presentation/lectionary/${dayKeyFromSlide}?season=${season}`);
+            setLectionarySearchOpen(false);
+            setLiturgySearchOpen(false);
+            return;
+        }
+
+        // Second priority: extract from slide ID
         const match = slideId.match(/^(lectionary|synaxarium)-([a-zA-Z0-9_]+)/);
         if (match) {
             const matchedDayKey = match[2];
             router.visit(`/presentation/lectionary/${matchedDayKey}?season=${season}`);
             setLectionarySearchOpen(false);
-        }
-    };
-
-    /**
-     * Handle local search result from the liturgy search overlay.
-     * Expected signature: (slideId: string, query: string) => void
-     */
-    const handleLiturgyLocalResult = (slideId: string, query: string) => {
-        // For liturgy, we navigate to the liturgy page with the current day context
-        const params = new URLSearchParams({
-            season: season,
-            dayKey: dayKey,
-            dayName: dayName
-        });
-        router.visit(`/presentation/liturgy?${params.toString()}`);
-        setLiturgySearchOpen(false);
-    };
-
-    /**
-     * Handle global insert from search overlay.
-     * Expected signature: (slide: Record<string, unknown>) => void
-     * This is used when the search overlay is in "insert" mode.
-     */
-    const handleGlobalInsert = (slide: Record<string, unknown>) => {
-        // Try to extract dayKey from the slide
-        const slideId = (slide.id as string) || '';
-        const dayKeyFromSlide = (slide.day_key as string) || '';
-
-        if (dayKeyFromSlide) {
-            router.visit(`/presentation/lectionary/${dayKeyFromSlide}?season=${season}`);
-            return;
-        }
-
-        // Extract from slide ID
-        const match = slideId.match(/^(lectionary|synaxarium)-([a-zA-Z0-9_]+)/);
-        if (match) {
-            const matchedDayKey = match[2];
-            router.visit(`/presentation/lectionary/${matchedDayKey}?season=${season}`);
+            setLiturgySearchOpen(false);
             return;
         }
 
@@ -178,25 +128,37 @@ export default function Dashboard({
 
         if (possibleDayKey) {
             router.visit(`/presentation/lectionary/${possibleDayKey}?season=${season}`);
+            setLectionarySearchOpen(false);
+            setLiturgySearchOpen(false);
         }
-    };
+    }, [season]);
+
+    /**
+     * ✅ Handle local search result
+     */
+    const handleLocalResult = useCallback((slideId: string, query: string) => {
+        const match = slideId.match(/^(lectionary|synaxarium)-([a-zA-Z0-9_]+)/);
+        if (match) {
+            const matchedDayKey = match[2];
+            router.visit(`/presentation/lectionary/${matchedDayKey}?season=${season}`);
+            setLectionarySearchOpen(false);
+            setLiturgySearchOpen(false);
+        }
+    }, [season]);
 
     // Keyboard shortcuts
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            // Ctrl+K or Cmd+K to open lectionary search
             if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
                 e.preventDefault();
                 setLectionarySearchOpen(true);
             }
 
-            // Ctrl+Shift+K or Cmd+Shift+K to open liturgy search
             if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'K') {
                 e.preventDefault();
                 setLiturgySearchOpen(true);
             }
 
-            // Prevent default F key behavior (browser find) if not in input
             if (e.key === 'f' && (e.target as HTMLElement).tagName !== 'INPUT') {
                 e.preventDefault();
             }
@@ -206,61 +168,66 @@ export default function Dashboard({
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, []);
 
-    // Update day context when day changes
+    // ✅ Update day context - مع منع التحديثات المتكررة
     useEffect(() => {
-        // تحديث السياق بالمعاملات المطلوبة: (date, coptic, season, readings)
+        // ✅ منع التحديث إذا تم التحديث بالفعل
+        if (contextUpdatedRef.current) {
+            return;
+        }
+
         setDateContext(
-            gregorianDateISO, // date
-            copticDate.formatted, // coptic
-            season, // season
-            [] // readings (فارغ مؤقتاً)
+            gregorianDateISO,
+            copticDate.formatted,
+            season,
+            []
         );
-    }, [dayKey, copticDate.formatted, season, gregorianDateISO, setDateContext]);
 
-    /**
-     * Navigate to the lectionary presentation for the current day.
-     */
-    const navigateToLectionary = () => {
+        contextUpdatedRef.current = true;
+
+        // ✅ إعادة تعيين الـ ref بعد 100ms للسماح بتحديثات مستقبلية
+        const timeout = setTimeout(() => {
+            contextUpdatedRef.current = false;
+        }, 100);
+
+        return () => clearTimeout(timeout);
+    }, [gregorianDateISO, copticDate.formatted, season, setDateContext]);
+
+    const navigateToLectionary = useCallback(() => {
         router.visit(`/presentation/lectionary/${dayKey}?season=${season}`);
-    };
+    }, [dayKey, season]);
 
-    /**
-     * Navigate to the liturgy presentation for the current day.
-     */
-    const navigateToLiturgy = () => {
+    const navigateToLiturgy = useCallback(() => {
         const params = new URLSearchParams({
             season: season,
             dayKey: dayKey,
             dayName: dayName
         });
         router.visit(`/presentation/liturgy?${params.toString()}`);
-    };
+    }, [dayKey, season, dayName]);
 
     return (
         <HosLayout title="قراءات اليوم">
-            {/* Search Overlays */}
             <SearchOverlay
                 open={lectionarySearchOpen}
                 onOpenChange={setLectionarySearchOpen}
-                onGlobalInsert={handleGlobalInsert}
-                onLocalResult={handleLectionaryLocalResult}
+                onGlobalInsert={handleDashboardSearchResult}
+                onLocalResult={handleLocalResult}
                 searchType="lectionary"
             />
 
             <SearchOverlay
                 open={liturgySearchOpen}
                 onOpenChange={setLiturgySearchOpen}
-                onGlobalInsert={handleGlobalInsert}
-                onLocalResult={handleLiturgyLocalResult}
+                onGlobalInsert={handleDashboardSearchResult}
+                onLocalResult={handleLocalResult}
                 searchType="liturgy"
             />
 
             <div className="space-y-6">
-                {/* Hero Card — Today's date and season */}
+                {/* Hero Card */}
                 <div
                     className={`relative overflow-hidden rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8 bg-gradient-to-bl ${currentSeasonStyle.gradient}`}
                 >
-                    {/* Decorative pattern */}
                     <div className="pointer-events-none absolute -left-20 -top-20 h-60 w-60 rounded-full bg-accent/5 blur-3xl" />
                     <div className="pointer-events-none absolute -bottom-16 -right-16 h-48 w-48 rounded-full bg-primary/5 blur-3xl" />
 
@@ -303,39 +270,40 @@ export default function Dashboard({
 
                         {/* Quick Actions */}
                         <div className="flex flex-col gap-2 justify-center">
-                            <>
-                                <Link
-                                    href={`/presentation/lectionary/${dayKey}?season=${season}`}
-                                    className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:opacity-90 hover:shadow-md active:scale-[0.98]"
-                                >
-                                    <BookOpen className="h-4 w-4" />
-                                    عرض اونلاين
-                                </Link>
+                            <Link
+                                href={`/presentation/lectionary/${dayKey}?season=${season}`}
+                                className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:opacity-90 hover:shadow-md active:scale-[0.98]"
+                            >
+                                <BookOpen className="h-4 w-4" />
+                                عرض اونلاين
+                            </Link>
 
-                                <Link
-                                    href={`/presentation/lectionary/${dayKey}?season=${season}`}
-                                    className="inline-flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400 px-4 py-2.5 text-sm font-semibold shadow-sm transition-all hover:bg-amber-500/20 active:scale-[0.98]"
-                                >
-                                    <Sparkles className="h-4 w-4" />
-                                    عرض القداس
-                                </Link>
+                            <Link
+                                href={`/presentation/lectionary/${dayKey}?season=${season}`}
+                                className="inline-flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400 px-4 py-2.5 text-sm font-semibold shadow-sm transition-all hover:bg-amber-500/20 active:scale-[0.98]"
+                            >
+                                <Sparkles className="h-4 w-4" />
+                                عرض القداس
+                            </Link>
 
-                                <button
-                                    type="button"
-                                    onClick={() => setLiturgySearchOpen(true)}
-                                    className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground shadow-sm transition-all hover:bg-muted active:scale-[0.98] cursor-pointer"
-                                    title="Ctrl+Shift+K للبحث في القداس"
-                                >
-                                    <Search className="h-4 w-4" />
-                                    استماع للقداس
-                                </button>
-                            </>
+                            <button
+                                type="button"
+                                onClick={() => setLiturgySearchOpen(true)}
+                                className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground shadow-sm transition-all hover:bg-muted active:scale-[0.98] cursor-pointer"
+                                title="Ctrl+Shift+K للبحث في القداس"
+                            >
+                                <Search className="h-4 w-4" />
+                                استماع للقداس
+                            </button>
                         </div>
                     </div>
                 </div>
 
                 {/* Sections Grid */}
                 <div>
+                    <h2 className="mb-4 text-lg font-semibold text-foreground">
+                        Liturgical Sections
+                    </h2>
                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
 
                         {/* Lectionary Section */}
@@ -408,7 +376,7 @@ export default function Dashboard({
                             </div>
                         </div>
 
-                        {/* Other sections (placeholder) */}
+                        {/* Other sections */}
                         <Link
                             href={`/presentation/lectionary/${dayKey}?season=${season}&mode=vespers`}
                             className="group flex items-center gap-4 rounded-xl border border-border bg-card p-4 shadow-sm transition-all hover:border-primary/20 hover:shadow-md active:scale-[0.98]"

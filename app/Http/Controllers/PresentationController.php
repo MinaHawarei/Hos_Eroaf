@@ -138,7 +138,6 @@ class PresentationController extends Controller
         $dayKey = (int) ($request->input('dayKey') ?? $request->input('dayKey.dayKey') ?? 0);
         $dayName = $request->input('dayName') ?? $request->input('dayName.dayName') ?? '';
 
-        Log::info('Liturgy Request - season: ' . $season . ', dayKey: ' . $dayKey . ', dayName: ' . $dayName);
         $churchSettingsRaw = $request->cookie('church_settings');
         $churchSettings = [];
         if ($churchSettingsRaw) {
