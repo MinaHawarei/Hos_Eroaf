@@ -271,15 +271,15 @@ export default function Dashboard({
                         {/* Quick Actions */}
                         <div className="flex flex-col gap-2 justify-center">
                             <Link
-                                href={`/presentation/lectionary/${dayKey}?season=${season}`}
+                                href={'#'}
                                 className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:opacity-90 hover:shadow-md active:scale-[0.98]"
                             >
                                 <BookOpen className="h-4 w-4" />
-                                عرض اونلاين
+                               الاستماع للقداس
                             </Link>
 
                             <Link
-                                href={`/presentation/lectionary/${dayKey}?season=${season}`}
+                                href={'#'}
                                 className="inline-flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400 px-4 py-2.5 text-sm font-semibold shadow-sm transition-all hover:bg-amber-500/20 active:scale-[0.98]"
                             >
                                 <Sparkles className="h-4 w-4" />
@@ -293,7 +293,7 @@ export default function Dashboard({
                                 title="Ctrl+Shift+K للبحث في القداس"
                             >
                                 <Search className="h-4 w-4" />
-                                استماع للقداس
+                                البحث في القداس
                             </button>
                         </div>
                     </div>

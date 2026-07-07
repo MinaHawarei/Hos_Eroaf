@@ -200,6 +200,7 @@ class PresentationSearchService
         }
 
         $dayLabel = is_string($data['Day'] ?? null) ? (string) $data['Day'] : $filename;
+        $dayKey = pathinfo($filename, PATHINFO_FILENAME);
 
         foreach ($data as $sectionKey => $items) {
             // Skip metadata keys
@@ -225,7 +226,8 @@ class PresentationSearchService
 
                 $hasCoptic = ReadingLineAssembler::readingHasCoptic($lines);
                 $slide = [
-                    'id' => 'global-lectionary-'.pathinfo($filename, PATHINFO_FILENAME).'-'.$sectionKey.'-'.($rIndex + 1),
+                    'id' => 'global-lectionary-'.$dayKey.'-'.$sectionKey.'-'.($rIndex + 1),
+                    'day_key' => $dayKey,
                     'section_code' => (string) $sectionKey,
                     'section_name' => $sectionName,
                     'title' => $reading['title_ar'] ?? $sectionName,
@@ -303,16 +305,15 @@ class PresentationSearchService
         $textContent = $data['content'];
         $textAr = array_values(array_filter(array_map('trim', explode("\n", $textContent))));
 
-        // ✅ Use the CopticDateService to format the date verbally
+        // Use the CopticDateService to format the date verbally
         $copticDate = $data['coptic_date'] ?? $filename;
         $formattedDate = $this->copticDateService->formatSearchLabel($copticDate, 'verbal');
-        // إذا أردت الصيغة المختصرة: $formattedDate = $this->copticDateService->formatSearchLabel($copticDate, 'short');
 
-        // ✅ Clean the first line: remove numbers and extract only the title
+        // Clean the first line: remove numbers and extract only the title
         $firstLine = !empty($textAr) ? $textAr[0] : '';
         $cleanTitle = $this->cleanSynaxariumTitle($firstLine);
 
-        // ✅ Use cleaned title for display
+        // Use cleaned title for display
         $title = $cleanTitle ?: 'السنكسار';
 
         $lines = [];
@@ -324,12 +325,15 @@ class PresentationSearchService
             return;
         }
 
+        $dayKey = pathinfo($filename, PATHINFO_FILENAME);
+
         $slide = [
-            'id' => 'global-synaxarium-'.pathinfo($filename, PATHINFO_FILENAME),
+            'id' => 'global-synaxarium-'.$dayKey,
+            'day_key' => $dayKey,
             'section_code' => 'synaxarium',
             'section_name' => 'السنكسار',
             'title' => $title,
-            'intonation' => $formattedDate, // ✅ الآن "اليوم الثلاثون من شهر بؤونة"
+            'intonation' => $formattedDate,
             'conclusion' => null,
             'lines' => $lines,
             'has_coptic' => false,
@@ -338,7 +342,6 @@ class PresentationSearchService
         $results[] = [
             'source' => 'synaxarium',
             'file' => $filename,
-            // ✅ Label format: السنكسار — اليوم الثلاثون من شهر بؤونة — استشهاد القديس يوحنا المعمدان
             'label' => 'السنكسار — ' . $formattedDate . ($cleanTitle ? ' — ' . $cleanTitle : ''),
             'slide' => $slide,
         ];
@@ -392,6 +395,7 @@ class PresentationSearchService
         $title = is_string($fileContent['title'] ?? null) ? (string) $fileContent['title'] : $filename;
         $slug = is_string($fileContent['code'] ?? null) ? (string) $fileContent['code'] : pathinfo($filename, PATHINFO_FILENAME);
         $content = $fileContent['content'] ?? [];
+        $dayKey = pathinfo($filename, PATHINFO_FILENAME);
 
         if (! is_array($content)) {
             return;
@@ -410,6 +414,7 @@ class PresentationSearchService
             $hasCoptic = ReadingLineAssembler::readingHasCoptic($lines);
             $slide = [
                 'id' => 'global-liturgy-'.$slug.'-part-'.($idx + 1),
+                'day_key' => $dayKey,
                 'section_code' => $slug,
                 'section_name' => $title,
                 'title' => $title,

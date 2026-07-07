@@ -17,9 +17,43 @@ class PresentationController extends Controller
         $dayData = null;
         try {
             $season = $request->query('season');
+
+            // ✅ Try to get data using dayKey
             $dayData = $content->getLectionary($dayKey, $season);
+
+            // ✅ If not found, try to search in Synaxarium
+            if (!$dayData) {
+                // Try to find the synaxarium file
+                $numericDay = is_numeric($dayKey) ? str_pad($dayKey, 3, '0', STR_PAD_LEFT) : $dayKey;
+                $synaxariumPath = base_path("storage/content/lectionary/synaxarium/{$numericDay}.json");
+
+                if (file_exists($synaxariumPath)) {
+                    $synaxariumData = json_decode(file_get_contents($synaxariumPath), true);
+                    if ($synaxariumData) {
+                        $textContent = $synaxariumData['content'] ?? '';
+                        $textAr = array_values(array_filter(array_map('trim', explode("\n", $textContent))));
+
+                        $dayData = [
+                            'Day' => $synaxariumData['coptic_date'] ?? '',
+                            'style' => 1,
+                            'synaxarium' => [
+                                [
+                                    'title_ar' => 'السنكسار',
+                                    'intonation' => 'اليوم ' . ($synaxariumData['coptic_date'] ?? ''),
+                                    'conclusion' => null,
+                                    'text_ar' => $textAr,
+                                    'text_co' => [],
+                                    'text_ar_co' => []
+                                ]
+                            ]
+                        ];
+                    }
+                }
+            }
+
         } catch (\Exception $e) {
-            // return redirect()->route('home');
+            Log::error('Error in lectionary: ' . $e->getMessage());
+            return redirect()->route('home');
         }
 
         if (! $dayData) {
@@ -98,13 +132,14 @@ class PresentationController extends Controller
                     'section_code' => $section['code'],
                     'section_name' => $section['name_ar'],
                     'title' => $reading['title_ar'],
-                    'intonation' => $reading['intonation'], // ✅ بدون قيمة افتراضية
-                    'conclusion' => $reading['conclusion'], // ✅ بدون قيمة افتراضية
+                    'intonation' => $reading['intonation'],
+                    'conclusion' => $reading['conclusion'],
                     'lines' => $reading['lines'],
                     'has_coptic' => $hasCoptic,
                 ];
             }
         }
+
         // If no slides, show empty state
         if (empty($slides)) {
             return Inertia::render('PresentationPage', [
@@ -129,10 +164,6 @@ class PresentationController extends Controller
 
     public function liturgy(Request $request, ContentService $content)
     {
-
-        //$dayKey = (int) $request->input('dayKey.dayKey');
-        //$dayName = $request->input('dayName.dayName');
-        //$season = $request->input('season.season');
         $season = $request->input('season', $request->input('season.season', 'annual'));
 
         $dayKey = (int) ($request->input('dayKey') ?? $request->input('dayKey.dayKey') ?? 0);
@@ -164,7 +195,6 @@ class PresentationController extends Controller
             'patron' => $patron,
             'diocesan_bishop' => $diocesan_bishop,
             'visiting_bishops' => $visiting_bishops,
-            // Fallbacks for compatibility if ContentService relies on old keys
             'bishoprole' => $diocesan_bishop['role'] ?? 'أسقف',
             'bishopCoRole' => $diocesan_bishop['coRole'] ?? 'أبيسكوبوس',
             'DefNoun' => $diocesan_bishop['DefNoun'] ?? 'ان',
@@ -252,7 +282,6 @@ class PresentationController extends Controller
             ];
         })->values();
 
-        //dd($sections);
         // ✅ Build slides
         $slides = [];
         foreach ($sections as $section) {
@@ -264,6 +293,7 @@ class PresentationController extends Controller
 
                 $slides[] = [
                     'id'               => "slide-{$section['code']}",
+                    'day_key'          => $dayKey,
                     'section_code'     => $section['code'],
                     'section_name'     => $section['name_ar'],
                     'has_alternatives' => true,
@@ -299,7 +329,7 @@ class PresentationController extends Controller
                 'has_coptic' => $reading['has_coptic'],
             ];
         }
-        //dd($slides);
+
         if (empty($slides)) {
             $lectionaryData = $content->getLectionary($dayKey, $season);
             if ($lectionaryData) {
@@ -319,6 +349,7 @@ class PresentationController extends Controller
     {
         return Inertia::render('MirrorComponent');
     }
+
     public function croma_mirror()
     {
         return Inertia::render('ChromaMirror');
@@ -341,10 +372,11 @@ class PresentationController extends Controller
             'q' => $q,
             'type_from_query' => $request->query('type'),
             'type_final' => $type,
-            'all_query_params' => $request->query(), // جميع الـ parameters
-            'full_url' => $request->fullUrl(), // الرابط الكامل
-            'headers' => $request->headers->all(), // جميع الـ headers
+            'all_query_params' => $request->query(),
+            'full_url' => $request->fullUrl(),
+            'headers' => $request->headers->all(),
         ]);
+
         if (! in_array($type, ['liturgy', 'lectionary', 'synaxarium','all'], true)) {
             $type = 'all';
         }
